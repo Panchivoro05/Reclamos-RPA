@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Sequence, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Sequence, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, creado_en_column, pg_enum
@@ -14,6 +14,17 @@ reclamo_codigo_seq = Sequence("reclamo_codigo_seq", metadata=Base.metadata)
 
 class Reclamo(Base):
     __tablename__ = "reclamos"
+    __table_args__ = (
+        # Un solo reclamo abierto por pedido y tipo. El servicio lo valida antes, pero
+        # este índice lo garantiza aunque lleguen dos peticiones al mismo tiempo.
+        Index(
+            "uq_reclamos_abierto_pedido_tipo",
+            "pedido_id",
+            "tipo",
+            unique=True,
+            postgresql_where=text("estado NOT IN ('resuelto', 'cerrado')"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     codigo: Mapped[str] = mapped_column(String(20), unique=True)

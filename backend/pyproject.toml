@@ -15,6 +15,7 @@ dependencies = [
     "email-validator>=2.2",
     "sqlalchemy>=2.0.36",
     "psycopg[binary]>=3.2",
+    "tzdata>=2024.2",
     "alembic>=1.14",
     "python-multipart>=0.0.18",
     "firebase-admin>=6.6",
@@ -37,6 +38,8 @@ extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "N", "RUF"]
+# N818 pide el sufijo "Error" en las excepciones; en español va primero (ErrorAPI).
+ignore = ["N818"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
