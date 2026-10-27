@@ -8,7 +8,8 @@ from app.models import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: no silencia los loggers de la app (pruebas, scripts).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Permite sobrescribir la URL desde código (las pruebas usan otra base de datos).
 if not config.get_main_option("sqlalchemy.url"):
