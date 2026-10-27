@@ -39,7 +39,10 @@ export async function api<T>(ruta: string, init: RequestInit = {}): Promise<T> {
       ...init,
       headers: { Accept: 'application/json', ...(await encabezadosAuth()), ...init.headers },
     });
-  } catch {
+  } catch (error) {
+    // fetch solo falla así por red caída o una petición que no pudo armarse;
+    // en desarrollo se muestra el motivo real en la consola de Metro.
+    if (__DEV__) console.warn(`Falló ${init.method ?? 'GET'} ${ruta}:`, error);
     throw new ApiError(
       0,
       'sin_conexion',

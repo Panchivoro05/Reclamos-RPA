@@ -1,6 +1,7 @@
 /** Hooks de TanStack Query: cada pantalla pide sus datos por aquí. */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { File } from 'expo-file-system';
 
 import { api } from './cliente';
 import type {
@@ -73,13 +74,9 @@ export function useCrearReclamo() {
       formulario.append('descripcion', reclamo.descripcion);
       formulario.append('items', JSON.stringify(reclamo.items));
       if (reclamo.foto) {
-        // En React Native, FormData acepta un archivo local como {uri, name, type}.
-        const archivo = {
-          uri: reclamo.foto.uri,
-          name: reclamo.foto.nombre,
-          type: reclamo.foto.tipoMime,
-        };
-        formulario.append('foto', archivo as unknown as Blob);
+        // Desde el SDK 58 el fetch global es expo/fetch, que no acepta el antiguo objeto
+        // {uri, name, type} de React Native. File de expo-file-system es un Blob real.
+        formulario.append('foto', new File(reclamo.foto.uri), reclamo.foto.nombre);
       }
       return api<ReclamoDetalle>('/reclamos', { method: 'POST', body: formulario });
     },
