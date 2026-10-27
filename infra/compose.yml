@@ -1,0 +1,44 @@
+# Servicios de infraestructura para desarrollo.
+# Uso (desde la raíz): docker compose -f infra/compose.yml up -d
+# Los puertos se publican solo en 127.0.0.1: Docker se salta las reglas de firewalld.
+name: reclamos-rpa
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reclamos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reclamos_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-reclamos}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg_data:
+  valkey_data:
