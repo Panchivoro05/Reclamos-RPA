@@ -76,7 +76,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ruff check . && ruff format --check . && pytest
 
 # App móvil
-cd app-movil && npm install && npx expo start
+cd app-movil && npm install && npm start   # Expo en el puerto 8082
 npm run lint && npm run typecheck && npm test
 ```
 
@@ -85,8 +85,8 @@ npm run lint && npm run typecheck && npm test
 - Usar Docker Engine (paquete `docker-ce` del repositorio oficial de Docker) con `docker compose`. Imágenes: `postgres:16`, `valkey/valkey:8`.
 - **Puertos y firewalld:** Docker publica los puertos saltándose las reglas de firewalld. Los servicios internos (PostgreSQL, Valkey) se publican solo en `127.0.0.1` (por ejemplo `"127.0.0.1:5432:5432"`); solo la API y Expo se exponen a la red local.
 - **SELinux:** todo volumen montado desde el host (bind mount) lleva `:Z`; preferir volúmenes con nombre para las bases de datos (por ejemplo `./data/pg:/var/lib/postgresql/data:Z`).
-- **firewalld:** para probar desde el celular hay que abrir los puertos 8000 (API) y 8081 (Expo):
-  `sudo firewall-cmd --add-port={8000,8081}/tcp --permanent && sudo firewall-cmd --reload`
+- **firewalld:** para probar desde el celular hay que abrir los puertos 8000 (API) y 8082 (Expo; `npm start` usa ese puerto porque el 8081 lo ocupa otro proyecto en la PC):
+  `sudo firewall-cmd --add-port={8000,8082}/tcp --permanent && sudo firewall-cmd --reload`
 - La app en el celular no puede usar `localhost`: la URL de la API se configura con `EXPO_PUBLIC_API_URL=http://<IP-de-la-PC-en-la-red-local>:8000`.
 - Playwright no tiene soporte oficial en Fedora. Si `rfbrowser init` falla, ejecutar el bot en un contenedor basado en `mcr.microsoft.com/playwright`.
 

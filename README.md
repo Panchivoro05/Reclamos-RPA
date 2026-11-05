@@ -97,12 +97,15 @@ En otra terminal:
 ```bash
 cd app-movil
 npm install
-npx expo start
+npm start          # Expo en el puerto 8082
 ```
 
 Escanea el código QR con Expo Go (Android) o con la cámara (iOS).
 
-Si cambias `app-movil/.env`, reinicia con `npx expo start -c`.
+Si cambias `app-movil/.env`, reinicia limpiando la caché con `npm start -- -c`.
+
+Expo usa el puerto **8082** (no el 8081 por defecto) para no chocar con otros proyectos que ya
+ocupen el 8081 en la misma PC.
 
 ### 5. firewalld (si el celular no llega a la PC)
 
@@ -110,7 +113,7 @@ La zona por defecto de **Fedora Workstation** ya permite los puertos 1025 a 6553
 (por ejemplo, Fedora Server), abre la API y Expo:
 
 ```bash
-sudo firewall-cmd --add-port={8000,8081}/tcp --permanent && sudo firewall-cmd --reload
+sudo firewall-cmd --add-port={8000,8082}/tcp --permanent && sudo firewall-cmd --reload
 ```
 
 Si Fedora corre en una máquina virtual, el adaptador de red debe estar en modo **puente**
