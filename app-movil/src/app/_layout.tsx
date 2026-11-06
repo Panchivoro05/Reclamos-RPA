@@ -27,6 +27,7 @@ export default function RootLayout() {
       >
         {/* Las rutas protegidas solo existen con sesión; al cerrarla se vuelve al login. */}
         <Stack.Protected guard={conSesion}>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="nuevo-reclamo"
