@@ -46,3 +46,4 @@ configure = ["too-many-calls-in-keyword.max_calls=15"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = ["e2e: ejecuta el bot con un navegador real contra un SISCAJA de prueba (lento)"]

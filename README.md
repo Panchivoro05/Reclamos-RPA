@@ -235,6 +235,15 @@ Los errores tienen la forma `{"detail": "<mensaje para el cliente>", "codigo": "
 cd backend && source .venv/bin/activate
 ruff check . && ruff format --check . && pytest
 
+# Sistema de caja (sus pruebas de sincronización usan la base siscaja_test de PostgreSQL)
+cd sistema-caja && source .venv/bin/activate
+ruff check . && ruff format --check . && pytest
+
+# Bot RPA: levanta su propio SISCAJA de prueba y ejecuta el bot con un navegador real (~50 s)
+cd bot-rpa && source .venv/bin/activate
+ruff check . && ruff format --check . && robocop check robot && pytest
+pytest -m "not e2e"     # solo las pruebas rápidas, sin navegador
+
 # App móvil
 cd app-movil
 npm run lint && npm run typecheck && npm test

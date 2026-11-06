@@ -12,6 +12,8 @@ class Settings(BaseSettings):
         env_file=("../.env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        # Permite Settings(operador_clave=...) desde código (pruebas y worker).
+        populate_by_name=True,
     )
 
     # SISCAJA y el operador con el que el bot inicia sesión (las mismas variables de caja).
