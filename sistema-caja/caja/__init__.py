@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import click
+import psycopg
 from flask import Flask, render_template
 from werkzeug.exceptions import HTTPException
 
@@ -16,6 +17,7 @@ from caja import db, seguridad
 from caja.config import Settings
 from caja.formato import fecha_lima, soles
 from caja.operadores import guardar_operador
+from caja.sincronizacion import sincronizar
 
 
 def create_app(ajustes: dict[str, Any] | None = None) -> Flask:
@@ -29,6 +31,7 @@ def create_app(ajustes: dict[str, Any] | None = None) -> Flask:
         OPERADOR_USUARIO=settings.operador_usuario,
         OPERADOR_NOMBRE=settings.operador_nombre,
         OPERADOR_CLAVE=settings.operador_clave,
+        VENTAS_DATABASE_URL=settings.ventas_database_url,
     )
     if ajustes:
         app.config.update(ajustes)
@@ -67,6 +70,22 @@ def create_app(ajustes: dict[str, Any] | None = None) -> Flask:
         click.echo(
             f"Base de datos lista en {app.config['DB_PATH']} "
             f"(operador: {app.config['OPERADOR_USUARIO']})."
+        )
+
+    @app.cli.command("sincronizar")
+    def sincronizar_pedidos() -> None:
+        """Copia o actualiza los pedidos desde la base de ventas (PostgreSQL)."""
+        conexion = db.conectar(app.config["DB_PATH"])
+        try:
+            db.crear_esquema(conexion)
+            resumen = sincronizar(conexion, app.config["VENTAS_DATABASE_URL"])
+        except psycopg.OperationalError as e:
+            raise click.ClickException(f"No se pudo conectar con la base de ventas: {e}") from e
+        finally:
+            conexion.close()
+        click.echo(
+            f"Sincronizacion completa: {resumen.nuevos} pedidos nuevos, "
+            f"{resumen.actualizados} actualizados."
         )
 
     return app

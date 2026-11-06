@@ -119,8 +119,14 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 flask --app caja init-db                           # crea las tablas y el operador
+flask --app caja sincronizar                       # copia los pedidos desde PostgreSQL
 flask --app caja run --host 127.0.0.1 --port 5050
 ```
+
+`flask --app caja sincronizar` simula el proceso por lotes que comparte los datos de ventas con
+caja: lee los pedidos del backend en una sesión de **solo lectura** y los copia a SQLite. Se puede
+repetir (actualiza sin duplicar) y nunca borra compensaciones. Ejecútalo después de
+`python -m app.seed` para que caja tenga las mismas fechas.
 
 Abre <http://127.0.0.1:5050> e ingresa con `CAJA_OPERADOR_USUARIO` y `CAJA_OPERADOR_CLAVE` del
 `.env`. Escucha solo en `127.0.0.1`: es un sistema interno y no debe verse desde la red.
