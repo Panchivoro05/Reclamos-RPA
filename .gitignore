@@ -19,6 +19,12 @@ backend/uploads/
 # Base de datos local de SISCAJA
 sistema-caja/data/
 
+# Ejecuciones del bot (capturas, videos, logs de Robot)
+bot-rpa/salidas/
+log.html
+report.html
+output.xml
+
 # Node / Expo
 node_modules/
 .expo/

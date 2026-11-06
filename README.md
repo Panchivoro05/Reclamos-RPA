@@ -26,6 +26,7 @@ siguientes).
 app-movil/   App del cliente (React Native + Expo SDK 58, Expo Router)
 backend/     API FastAPI + SQLAlchemy + Alembic + pruebas (pytest)
 sistema-caja/ Sistema de caja antiguo SISCAJA (Flask + Jinja2 + SQLite, sin API)
+bot-rpa/     Bot RPA que opera SISCAJA (Robot Framework + Browser Library)
 infra/       Docker Compose (PostgreSQL 16, Valkey 8)
 .github/     CI: ruff + pytest del backend, lint + typecheck + Jest de la app
 ```
@@ -131,7 +132,34 @@ repetir (actualiza sin duplicar) y nunca borra compensaciones. Ejecútalo despu�
 Abre <http://127.0.0.1:5050> e ingresa con `CAJA_OPERADOR_USUARIO` y `CAJA_OPERADOR_CLAVE` del
 `.env`. Escucha solo en `127.0.0.1`: es un sistema interno y no debe verse desde la red.
 
-### 6. firewalld (si el celular no llega a la PC)
+### 6. Bot RPA
+
+Opera SISCAJA por su interfaz web con Robot Framework + Browser Library (Playwright), como lo
+haría un cajero. Necesita SISCAJA corriendo. En otra terminal:
+
+```bash
+cd bot-rpa
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+rfbrowser init chromium        # descarga Playwright y Chromium (una sola vez, ~300 MB)
+
+# Demo: abre el navegador y se ve al bot mover el cursor, escribir y hacer clic
+python -m bot_rpa --pedido BY-000101 --solucion reembolso_parcial --monto 10 \
+  --motivo "Faltó una hamburguesa en el pedido" --visible
+```
+
+- Soluciones: `reenvio`, `reembolso_parcial`, `reembolso_total` y `cupon` (`--monto` solo en
+  parcial y cupón).
+- `--total-esperado 82.50` y `--items-esperados '[{"producto": "Nuggets x6", "cantidad": 1}]'`
+  hacen que el bot compare lo que ve en caja con lo que dice el reclamo.
+- Sin `--visible` corre oculto (unos 7 s), como lo hará el worker de la fase 3.
+- Cada ejecución deja en `bot-rpa/salidas/<fecha>_<pedido>/`: `resultado.json`, `capturas/`
+  (una por paso, con el cursor y el paso visibles), `video.webm` y el log de Robot.
+- Playwright funcionó directamente en Fedora 44; si `rfbrowser init` fallara en otra versión,
+  se puede ejecutar el bot en un contenedor `mcr.microsoft.com/playwright`.
+
+### 7. firewalld (si el celular no llega a la PC)
 
 La zona por defecto de **Fedora Workstation** ya permite los puertos 1025 a 65535. En otras zonas
 (por ejemplo, Fedora Server), abre la API y Expo:

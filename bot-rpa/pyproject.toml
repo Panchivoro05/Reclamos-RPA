@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bot-rpa"
+version = "0.1.0"
+description = "Bot RPA de BurgerYa: opera SISCAJA por su interfaz web (Robot Framework + Browser)"
+requires-python = ">=3.12"
+dependencies = [
+    "robotframework>=7.5",
+    "robotframework-browser>=21.0",
+    "pydantic-settings>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "robotframework-robocop>=6.0",
+]
+
+[project.scripts]
+bot-rpa = "bot_rpa.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["bot_rpa*"]
+
+[tool.setuptools.package-data]
+bot_rpa = ["cursor.js"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "N", "RUF"]
+# N999: las librerías de Robot Framework se llaman como su clase (BotRPA.py).
+# N818: en español el sufijo "Error" va primero (ErrorBot).
+ignore = ["N999", "N818"]
+
+[tool.robocop.lint]
+# Los pasos del bot son secuencias legibles de 11 a 15 acciones; partirlos lo haría más confuso.
+configure = ["too-many-calls-in-keyword.max_calls=15"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
