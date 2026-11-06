@@ -75,6 +75,17 @@ python -m app.seed               # datos de prueba
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ruff check . && ruff format --check . && pytest
 
+# Sistema de caja (SISCAJA)
+cd sistema-caja && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+flask --app caja init-db && flask --app caja sincronizar
+flask --app caja run --host 127.0.0.1 --port 5050
+
+# Bot RPA (necesita SISCAJA corriendo)
+cd bot-rpa && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+rfbrowser init chromium
+python -m bot_rpa --pedido BY-000101 --solucion cupon --monto 5 --motivo "..." --visible
+ruff check . && robocop check robot && pytest
+
 # App móvil
 cd app-movil && npm install && npm start   # Expo en el puerto 8082
 npm run lint && npm run typecheck && npm test

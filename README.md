@@ -5,15 +5,18 @@ cadena de comida rápida con delivery en Lima.
 
 El cliente registra desde la app móvil un reclamo sobre su pedido (producto equivocado, pedido
 incompleto, producto en mal estado o demora), con descripción y foto. La API lo valida, lo guarda
-en PostgreSQL y lo deja listo para el procesamiento automático (worker + bot RPA en las fases
-siguientes).
+en PostgreSQL y lo deja listo para el procesamiento automático.
+
+La compensación se registra en **SISCAJA**, el sistema de caja antiguo de BurgerYa, que no tiene
+API: un **bot RPA** lo opera por su interfaz web, como lo haría un cajero (el worker que conecta
+ambos lados llega en la fase 3).
 
 ## Estado
 
 | Fase | Contenido | Estado |
 |---|---|---|
 | 1 | Base del proyecto, pedidos y reclamos (API + app) | ✅ |
-| 2 | Sistema de caja antiguo + bot RPA | En curso |
+| 2 | Sistema de caja antiguo + bot RPA | ✅ |
 | 3 | Automatización de punta a punta (Celery) | Pendiente |
 | 4 | Tiempo real y notificaciones | Pendiente |
 | 5 | IA con Gemini | Pendiente |
@@ -23,12 +26,12 @@ siguientes).
 ## Estructura
 
 ```
-app-movil/   App del cliente (React Native + Expo SDK 58, Expo Router)
-backend/     API FastAPI + SQLAlchemy + Alembic + pruebas (pytest)
-sistema-caja/ Sistema de caja antiguo SISCAJA (Flask + Jinja2 + SQLite, sin API)
-bot-rpa/     Bot RPA que opera SISCAJA (Robot Framework + Browser Library)
-infra/       Docker Compose (PostgreSQL 16, Valkey 8)
-.github/     CI: ruff + pytest del backend, lint + typecheck + Jest de la app
+app-movil/     App del cliente (React Native + Expo SDK 58, Expo Router)
+backend/       API FastAPI + SQLAlchemy + Alembic + pruebas (pytest)
+sistema-caja/  Sistema de caja antiguo SISCAJA (Flask + Jinja2 + SQLite, sin API)
+bot-rpa/       Bot RPA que opera SISCAJA (Robot Framework + Browser Library)
+infra/         Docker Compose (PostgreSQL 16, Valkey 8)
+.github/       CI: backend, sistema de caja, bot (con navegador real) y app
 ```
 
 ## Requisitos (Fedora)
@@ -228,6 +231,44 @@ Los errores tienen la forma `{"detail": "<mensaje para el cliente>", "codigo": "
 - "Producto equivocado" y "mal estado" requieren foto (JPG, PNG o WEBP, máximo 5 MB; el formato se
   verifica por el contenido del archivo, no por su extensión).
 
+## SISCAJA y bot RPA
+
+### Reglas de una compensación en SISCAJA
+
+| Tipo | Monto |
+|---|---|
+| `reenvio` | S/ 0.00 (se reenvía el producto) |
+| `reembolso_parcial` | Mayor que 0 y hasta el saldo reembolsable |
+| `reembolso_total` | El saldo reembolsable completo |
+| `cupon` | Mayor que 0 y hasta el total del pedido; no descuenta saldo |
+
+El saldo reembolsable es el total del pedido menos los reembolsos anteriores. Los pedidos
+cancelados no admiten compensaciones. Cada registro genera un número de operación `CMP-000001`.
+
+### Resultado del bot (`resultado.json`)
+
+```json
+{
+  "exito": true,
+  "codigo_error": null,
+  "mensaje": "Compensacion registrada en SISCAJA.",
+  "numero_operacion": "CMP-000001",
+  "monto_registrado": "S/ 10.00",
+  "pasos": [{"paso": "login", "descripcion": "...", "captura": "capturas/01_login.png"}],
+  "video": "video.webm",
+  "duracion_s": 7.2
+}
+```
+
+| `codigo_error` | Cuándo |
+|---|---|
+| `credenciales_invalidas` | SISCAJA rechazó al operador |
+| `pedido_inexistente` | El pedido no está en caja |
+| `datos_no_coinciden` | Los ítems o el total en caja no coinciden con lo esperado |
+| `pedido_no_compensable` | El pedido está cancelado |
+| `compensacion_rechazada` | SISCAJA rechazó la compensación (por ejemplo, monto excedido) |
+| `tiempo_agotado` / `error_inesperado` | El bot no terminó o falló algo ajeno al negocio |
+
 ## Calidad
 
 ```bash
@@ -269,3 +310,19 @@ GitHub Actions ejecuta lo mismo en cada push a `main` y en cada pull request.
   sesión, las pantallas privadas no existen; un 401 devuelve al login.
 - **Expo SDK 58:** el `fetch` global es `expo/fetch`; la foto se adjunta con `File` de
   `expo-file-system` (el antiguo objeto `{uri, name, type}` ya no funciona).
+- **SISCAJA sin API, a propósito:** solo HTML y formularios (una prueba lo verifica). El bot
+  debe operarlo por la pantalla; esa es la razón de usar RPA. Cada elemento tiene un `id`
+  estable para que el bot lo ubique aunque cambie el diseño.
+- **Montos en céntimos en SISCAJA** (enteros en SQLite) y `BEGIN IMMEDIATE` al registrar:
+  dos compensaciones simultáneas no pueden pasar el saldo ni repetir el número de operación.
+- **Las reglas de compensación viven en SISCAJA,** no en el bot: igual que un cajero, el bot
+  intenta y, si la pantalla lo rechaza, reporta el error.
+- **Sincronización por lotes y de solo lectura:** `flask --app caja sincronizar` lee ventas en
+  una sesión `read_only` de PostgreSQL. En CI se sincroniza contra la base real del backend para
+  detectar si cambia una columna.
+- **Bot visible:** Playwright no dibuja el mouse; el bot inyecta desde afuera un cursor que sigue
+  los eventos reales del mouse, resalta el elemento activo y muestra el paso en un banner.
+  Aparece en vivo (`--visible`), en las capturas y en el video.
+- **El robot corre en un proceso aparte** con tiempo límite: si el navegador se cuelga, no
+  arrastra al worker. La clave viaja por variable de entorno y se escribe con `Type Secret`
+  (no queda en ningún log; una prueba lo verifica).

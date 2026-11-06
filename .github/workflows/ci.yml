@@ -56,3 +56,87 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test -- --ci
+
+  sistema-caja:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: reclamos
+          POSTGRES_PASSWORD: reclamos_dev
+          POSTGRES_DB: reclamos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U reclamos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://reclamos:reclamos_dev@localhost:5432/reclamos
+      CAJA_TEST_VENTAS_DATABASE_URL: postgresql://reclamos:reclamos_dev@localhost:5432/siscaja_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            sistema-caja/pyproject.toml
+            backend/pyproject.toml
+      - name: Instalar
+        run: pip install -e "./sistema-caja[dev]" -e ./backend
+      - name: Lint
+        working-directory: sistema-caja
+        run: ruff check . && ruff format --check .
+      - name: Pruebas
+        working-directory: sistema-caja
+        run: pytest
+      # Contrato con el backend: SISCAJA debe poder leer las tablas reales (migradas y con
+      # datos de prueba). Si el backend cambia una columna que caja usa, esto falla.
+      - name: Sincronizar contra la base real del backend
+        env:
+          CAJA_DB_PATH: ${{ runner.temp }}/caja.db
+          CAJA_OPERADOR_CLAVE: clave-de-ci
+        run: |
+          (cd backend && alembic upgrade head && python -m app.seed)
+          cd sistema-caja
+          flask --app caja init-db
+          flask --app caja sincronizar | tee salida.txt
+          grep -q "8 pedidos nuevos" salida.txt
+
+  bot-rpa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            bot-rpa/pyproject.toml
+            sistema-caja/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Las pruebas levantan un SISCAJA de prueba: se instala en el mismo entorno.
+      - name: Instalar
+        run: pip install -e "./bot-rpa[dev]" -e ./sistema-caja
+      - name: Instalar Playwright y Chromium
+        run: rfbrowser init --with-deps chromium
+      - name: Lint
+        working-directory: bot-rpa
+        run: |
+          ruff check . && ruff format --check .
+          robocop check robot && robocop format --check robot
+      - name: Pruebas (bot real contra SISCAJA de prueba)
+        working-directory: bot-rpa
+        run: pytest --basetemp="${{ runner.temp }}/pytest"
+      - name: Guardar capturas y videos si fallan
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: salidas-del-bot
+          path: ${{ runner.temp }}/pytest/**/salidas/
+          if-no-files-found: ignore
