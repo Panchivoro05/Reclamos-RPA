@@ -1,0 +1,84 @@
+/* SISCAJA v2.3: aspecto de sistema interno de los 2000, a propósito. */
+body {
+  margin: 0;
+  padding: 12px;
+  background: #808080;
+  font-family: Verdana, Tahoma, Arial, sans-serif;
+  font-size: 12px;
+  color: #000;
+}
+.marco {
+  width: 860px;
+  margin: 0 auto;
+  background: #d4d0c8;
+  border: 2px outset #fff;
+}
+.barra-titulo {
+  padding: 4px 8px;
+  background: linear-gradient(to right, #0a246a, #a6caf0);
+  color: #fff;
+}
+.barra-titulo .logo { font-weight: bold; font-size: 14px; margin-right: 12px; }
+.barra-titulo .empresa { font-size: 11px; }
+.barra-menu {
+  padding: 4px 8px;
+  border-bottom: 1px solid #808080;
+}
+.barra-menu a { color: #000080; margin-right: 14px; }
+.barra-menu .operador { float: right; }
+.contenido { padding: 14px; min-height: 320px; vertical-align: top; }
+.barra-estado {
+  padding: 2px 8px;
+  border-top: 1px solid #808080;
+  font-size: 10px;
+  color: #333;
+}
+.ventana { border: 2px groove #fff; padding: 10px; margin: 0 0 10px; }
+.ventana.angosta { width: 440px; margin: 30px auto; }
+.ventana legend { font-weight: bold; }
+.formulario td { padding: 3px 4px; }
+.en-linea { display: inline; }
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  font-family: inherit;
+  font-size: 12px;
+  border: 2px inset #fff;
+  padding: 2px 3px;
+  background: #fff;
+}
+button {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 2px 12px;
+  background: #d4d0c8;
+  border: 2px outset #fff;
+  cursor: default;
+}
+button:active { border-style: inset; }
+.error {
+  background: #ffffe1;
+  border: 1px solid #c00;
+  color: #c00;
+  padding: 6px;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+.exito {
+  background: #e1ffe1;
+  border: 1px solid #060;
+  color: #060;
+  padding: 6px;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+.datos { width: 100%; margin-bottom: 10px; }
+.datos th { text-align: right; width: 110px; padding: 2px 6px; }
+.datos td { background: #fff; border: 1px inset #fff; padding: 2px 6px; }
+.grilla { width: 100%; border-collapse: collapse; background: #fff; }
+.grilla th { background: #d4d0c8; border: 1px solid #808080; padding: 3px 6px; text-align: left; }
+.grilla td { border: 1px solid #c0c0c0; padding: 3px 6px; }
+.grilla tbody tr:nth-child(even) td { background: #f0f0f0; }
+.num { text-align: right; }
+.nota { font-size: 10px; color: #444; }
+.estado-entregado { color: #060; font-weight: bold; }
+.estado-cancelado { color: #c00; font-weight: bold; }
+.estado-en_camino, .estado-en_preparacion { color: #00c; font-weight: bold; }

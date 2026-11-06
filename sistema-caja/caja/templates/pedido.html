@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Pedido {{ pedido.codigo }}{% endblock %}
+{% block contenido %}
+<fieldset class="ventana">
+  <legend>Detalle del pedido</legend>
+  <table class="datos">
+    <tr><th>Pedido:</th><td id="pedido-codigo">{{ pedido.codigo }}</td>
+        <th>Estado:</th><td id="pedido-estado" class="estado-{{ pedido.estado }}">{{ pedido.estado_texto }}</td></tr>
+    <tr><th>Cliente:</th><td id="pedido-cliente">{{ pedido.cliente_nombre }}</td>
+        <th>Correo:</th><td id="pedido-email">{{ pedido.cliente_email }}</td></tr>
+    <tr><th>Local:</th><td id="pedido-local">{{ pedido.local }}</td>
+        <th>Direccion:</th><td id="pedido-direccion">{{ pedido.direccion_entrega }}</td></tr>
+    <tr><th>Fecha pedido:</th><td id="pedido-fecha">{{ pedido.creado_en | fecha }}</td>
+        <th>Fecha entrega:</th><td id="pedido-fecha-entrega">{{ pedido.entregado_en | fecha }}</td></tr>
+  </table>
+
+  <table id="tabla-items" class="grilla">
+    <thead>
+      <tr><th>#</th><th>Producto</th><th>Cant.</th><th>P. Unit.</th><th>Subtotal</th></tr>
+    </thead>
+    <tbody>
+      {% for item in pedido.items %}
+      <tr id="item-{{ loop.index }}" class="item">
+        <td>{{ loop.index }}</td>
+        <td class="item-producto">{{ item.producto }}</td>
+        <td class="item-cantidad num">{{ item.cantidad }}</td>
+        <td class="item-precio num">{{ item.precio_unitario_centimos | soles }}</td>
+        <td class="item-subtotal num">{{ item.subtotal_centimos | soles }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><th colspan="4" class="num">TOTAL:</th><th id="pedido-total" class="num">{{ pedido.total_centimos | soles }}</th></tr>
+    </tfoot>
+  </table>
+  <p class="nota">Ultima sincronizacion con ventas: {{ pedido.sincronizado_en | fecha }}</p>
+</fieldset>
+{% endblock %}

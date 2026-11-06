@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titulo %}Error {{ error.code }}{% endblock %}
+{% block contenido %}
+<fieldset class="ventana angosta">
+  <legend>Error {{ error.code }}</legend>
+  <div id="mensaje-error" class="error">{{ error.description }}</div>
+  <p><a id="link-volver" href="{{ url_for('caja.buscar_pedido') }}">&lt;&lt; Volver</a></p>
+</fieldset>
+{% endblock %}

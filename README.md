@@ -13,7 +13,7 @@ siguientes).
 | Fase | Contenido | Estado |
 |---|---|---|
 | 1 | Base del proyecto, pedidos y reclamos (API + app) | ✅ |
-| 2 | Sistema de caja antiguo + bot RPA | Pendiente |
+| 2 | Sistema de caja antiguo + bot RPA | En curso |
 | 3 | Automatización de punta a punta (Celery) | Pendiente |
 | 4 | Tiempo real y notificaciones | Pendiente |
 | 5 | IA con Gemini | Pendiente |
@@ -25,6 +25,7 @@ siguientes).
 ```
 app-movil/   App del cliente (React Native + Expo SDK 58, Expo Router)
 backend/     API FastAPI + SQLAlchemy + Alembic + pruebas (pytest)
+sistema-caja/ Sistema de caja antiguo SISCAJA (Flask + Jinja2 + SQLite, sin API)
 infra/       Docker Compose (PostgreSQL 16, Valkey 8)
 .github/     CI: ruff + pytest del backend, lint + typecheck + Jest de la app
 ```
@@ -107,7 +108,24 @@ Si cambias `app-movil/.env`, reinicia limpiando la caché con `npm start -- -c`.
 Expo usa el puerto **8082** (no el 8081 por defecto) para no chocar con otros proyectos que ya
 ocupen el 8081 en la misma PC.
 
-### 5. firewalld (si el celular no llega a la PC)
+### 5. Sistema de caja antiguo (SISCAJA)
+
+Simula el sistema interno heredado de BurgerYa: solo tiene pantallas web y **no tiene API**; el bot
+RPA lo opera por la interfaz. En otra terminal:
+
+```bash
+cd sistema-caja
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+flask --app caja init-db                           # crea las tablas y el operador
+flask --app caja run --host 127.0.0.1 --port 5050
+```
+
+Abre <http://127.0.0.1:5050> e ingresa con `CAJA_OPERADOR_USUARIO` y `CAJA_OPERADOR_CLAVE` del
+`.env`. Escucha solo en `127.0.0.1`: es un sistema interno y no debe verse desde la red.
+
+### 6. firewalld (si el celular no llega a la PC)
 
 La zona por defecto de **Fedora Workstation** ya permite los puertos 1025 a 65535. En otras zonas
 (por ejemplo, Fedora Server), abre la API y Expo:

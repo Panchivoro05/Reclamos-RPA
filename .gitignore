@@ -16,6 +16,9 @@ htmlcov/
 # Archivos subidos por los clientes
 backend/uploads/
 
+# Base de datos local de SISCAJA
+sistema-caja/data/
+
 # Node / Expo
 node_modules/
 .expo/

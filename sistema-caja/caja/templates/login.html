@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}Ingreso{% endblock %}
+{% block contenido %}
+<fieldset class="ventana angosta">
+  <legend>Ingreso al sistema</legend>
+  {% if error %}<div id="mensaje-error" class="error">{{ error }}</div>{% endif %}
+  <form id="form-login" method="post" action="{{ url_for('caja.login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if siguiente %}<input type="hidden" name="siguiente" value="{{ siguiente }}">{% endif %}
+    <table class="formulario">
+      <tr>
+        <td><label for="usuario">Usuario:</label></td>
+        <td><input id="usuario" name="usuario" type="text" value="{{ usuario }}" autocomplete="off" required></td>
+      </tr>
+      <tr>
+        <td><label for="clave">Clave:</label></td>
+        <td><input id="clave" name="clave" type="password" required></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><button id="btn-ingresar" type="submit">Ingresar</button></td>
+      </tr>
+    </table>
+  </form>
+</fieldset>
+{% endblock %}
