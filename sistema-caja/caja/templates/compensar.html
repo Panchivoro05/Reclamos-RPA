@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titulo %}Compensar {{ pedido.codigo }}{% endblock %}
+{% block contenido %}
+<fieldset class="ventana">
+  <legend>Registrar compensacion - Pedido <span id="comp-pedido">{{ pedido.codigo }}</span></legend>
+  {% if error %}<div id="mensaje-error" class="error">{{ error }}</div>{% endif %}
+  <table class="datos">
+    <tr><th>Cliente:</th><td>{{ pedido.cliente_nombre }}</td>
+        <th>Total pedido:</th><td id="comp-total">{{ pedido.total_centimos | soles }}</td></tr>
+    <tr><th>Estado:</th><td class="estado-{{ pedido.estado }}">{{ pedido.estado_texto }}</td>
+        <th>Saldo reemb.:</th><td id="comp-saldo">{{ saldo | soles }}</td></tr>
+  </table>
+  <form id="form-compensacion" method="post" action="{{ url_for('caja.compensar', codigo=pedido.codigo) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <table class="formulario">
+      <tr>
+        <td><label for="comp-tipo">Tipo:</label></td>
+        <td>
+          <select id="comp-tipo" name="tipo" required>
+            <option value="">-- Seleccione --</option>
+            {% for tipo in tipos %}
+            <option value="{{ tipo.value }}" {% if formulario.tipo == tipo.value %}selected{% endif %}>{{ tipo.texto }}</option>
+            {% endfor %}
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td><label for="comp-monto">Monto (S/):</label></td>
+        <td>
+          <input id="comp-monto" name="monto" type="text" value="{{ formulario.monto }}" size="10" autocomplete="off">
+          <span class="nota">No aplica para reenvio. En reembolso total se usa el saldo.</span>
+        </td>
+      </tr>
+      <tr>
+        <td><label for="comp-motivo">Motivo:</label></td>
+        <td><textarea id="comp-motivo" name="motivo" rows="4" cols="60" required>{{ formulario.motivo }}</textarea></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td>
+          <button id="btn-registrar" type="submit">Registrar</button>
+          <a id="link-cancelar" href="{{ url_for('caja.detalle_pedido', codigo=pedido.codigo) }}">Cancelar</a>
+        </td>
+      </tr>
+    </table>
+  </form>
+</fieldset>
+{% endblock %}

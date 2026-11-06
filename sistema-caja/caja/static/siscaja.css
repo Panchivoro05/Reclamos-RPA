@@ -82,3 +82,12 @@ button:active { border-style: inset; }
 .estado-entregado { color: #060; font-weight: bold; }
 .estado-cancelado { color: #c00; font-weight: bold; }
 .estado-en_camino, .estado-en_preparacion { color: #00c; font-weight: bold; }
+a.boton {
+  display: inline-block;
+  padding: 2px 12px;
+  background: #d4d0c8;
+  border: 2px outset #fff;
+  color: #000;
+  text-decoration: none;
+}
+a.boton:active { border-style: inset; }

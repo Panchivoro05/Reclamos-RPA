@@ -17,7 +17,7 @@
     <tr>
       <td class="barra-menu">
         <a id="menu-buscar" href="{{ url_for('caja.buscar_pedido') }}">[F2] Buscar pedido</a>
-        {% block menu_extra %}{% endblock %}
+        <a id="menu-compensaciones" href="{{ url_for('caja.historial') }}">[F3] Compensaciones</a>
         <span class="operador">
           Operador: <b id="operador-actual">{{ g.operador.usuario }}</b>
           <form id="form-salir" class="en-linea" method="post" action="{{ url_for('caja.logout') }}">

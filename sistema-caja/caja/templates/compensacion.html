@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block titulo %}Operacion {{ c.numero }}{% endblock %}
+{% block contenido %}
+<fieldset class="ventana angosta">
+  <legend>Comprobante de compensacion</legend>
+  <div id="mensaje-exito" class="exito">Compensacion registrada correctamente.</div>
+  <table class="datos">
+    <tr><th>Nro. operacion:</th><td id="numero-operacion">{{ c.numero }}</td></tr>
+    <tr><th>Pedido:</th><td id="op-pedido">{{ c.pedido_codigo }}</td></tr>
+    <tr><th>Tipo:</th><td id="op-tipo" data-tipo="{{ c.tipo.value }}">{{ c.tipo.texto }}</td></tr>
+    <tr><th>Monto:</th><td id="op-monto">{{ c.monto_centimos | soles }}</td></tr>
+    <tr><th>Motivo:</th><td id="op-motivo">{{ c.motivo }}</td></tr>
+    <tr><th>Operador:</th><td id="op-operador">{{ c.operador }}</td></tr>
+    <tr><th>Fecha:</th><td id="op-fecha">{{ c.creado_en | fecha }}</td></tr>
+  </table>
+  <p><a id="link-pedido" href="{{ url_for('caja.detalle_pedido', codigo=c.pedido_codigo) }}">&lt;&lt; Volver al pedido</a></p>
+</fieldset>
+{% endblock %}

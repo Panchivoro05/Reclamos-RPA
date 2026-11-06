@@ -3,7 +3,8 @@
 from flask import Blueprint, abort, g, redirect, render_template, request, session, url_for
 from flask.typing import ResponseReturnValue
 
-from caja import pedidos
+from caja import compensaciones, pedidos
+from caja.compensaciones import ErrorCompensacion, TipoCompensacion
 from caja.operadores import autenticar
 from caja.seguridad import destino_seguro, iniciar_sesion, login_requerido
 
@@ -56,7 +57,63 @@ def buscar_pedido() -> ResponseReturnValue:
 @bp.get("/pedidos/<codigo>")
 @login_requerido
 def detalle_pedido(codigo: str) -> ResponseReturnValue:
+    pedido = _pedido_o_404(codigo)
+    return render_template(
+        "pedido.html",
+        pedido=pedido,
+        compensaciones=compensaciones.listar_por_pedido(pedido.id),
+        saldo=compensaciones.saldo_reembolsable(pedido.id),
+    )
+
+
+@bp.route("/pedidos/<codigo>/compensar", methods=["GET", "POST"])
+@login_requerido
+def compensar(codigo: str) -> ResponseReturnValue:
+    pedido = _pedido_o_404(codigo)
+    formulario = {"tipo": "", "monto": "", "motivo": ""}
+    error = None
+    if request.method == "POST":
+        formulario = {campo: request.form.get(campo, "") for campo in formulario}
+        try:
+            compensacion = compensaciones.registrar_compensacion(
+                pedido,
+                formulario["tipo"],
+                formulario["monto"],
+                formulario["motivo"],
+                g.operador.id,
+            )
+        except ErrorCompensacion as e:
+            error = str(e)
+        else:
+            # Post/Redirect/Get: recargar la confirmación no registra otra compensación.
+            return redirect(url_for("caja.ver_compensacion", numero=compensacion.numero))
+    return render_template(
+        "compensar.html",
+        pedido=pedido,
+        saldo=compensaciones.saldo_reembolsable(pedido.id),
+        tipos=list(TipoCompensacion),
+        formulario=formulario,
+        error=error,
+    ), (422 if error else 200)
+
+
+@bp.get("/compensaciones/<numero>")
+@login_requerido
+def ver_compensacion(numero: str) -> ResponseReturnValue:
+    compensacion = compensaciones.obtener_compensacion(numero)
+    if compensacion is None:
+        abort(404, f"No existe la operacion {numero.upper()}.")
+    return render_template("compensacion.html", c=compensacion)
+
+
+@bp.get("/compensaciones")
+@login_requerido
+def historial() -> ResponseReturnValue:
+    return render_template("historial.html", compensaciones=compensaciones.listar_recientes())
+
+
+def _pedido_o_404(codigo: str) -> pedidos.Pedido:
     pedido = pedidos.buscar_pedido(codigo)
     if pedido is None:
         abort(404, f"No existe el pedido {pedidos.normalizar_codigo(codigo)}.")
-    return render_template("pedido.html", pedido=pedido)
+    return pedido

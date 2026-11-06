@@ -31,6 +31,8 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "N", "RUF"]
+# N818 pide el sufijo "Error" en las excepciones; en español va primero (ErrorCompensacion).
+ignore = ["N818"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

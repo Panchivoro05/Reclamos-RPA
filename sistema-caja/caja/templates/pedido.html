@@ -35,4 +35,17 @@
   </table>
   <p class="nota">Ultima sincronizacion con ventas: {{ pedido.sincronizado_en | fecha }}</p>
 </fieldset>
+
+<fieldset class="ventana">
+  <legend>Compensaciones del pedido</legend>
+  <p>Saldo reembolsable: <b id="saldo-reembolsable">{{ saldo | soles }}</b></p>
+  {% include "_tabla_compensaciones.html" %}
+  <p>
+    {% if pedido.estado != 'cancelado' %}
+    <a id="btn-compensar" class="boton" href="{{ url_for('caja.compensar', codigo=pedido.codigo) }}">[F5] Registrar compensacion</a>
+    {% else %}
+    <span class="nota">Pedido cancelado: no admite compensaciones.</span>
+    {% endif %}
+  </p>
+</fieldset>
 {% endblock %}

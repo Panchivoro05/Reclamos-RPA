@@ -1,0 +1,20 @@
+<table id="tabla-compensaciones" class="grilla">
+  <thead>
+    <tr><th>Nro. operacion</th><th>Pedido</th><th>Tipo</th><th>Monto</th><th>Motivo</th><th>Operador</th><th>Fecha</th></tr>
+  </thead>
+  <tbody>
+    {% for c in compensaciones %}
+    <tr id="comp-{{ c.numero }}" class="compensacion">
+      <td><a href="{{ url_for('caja.ver_compensacion', numero=c.numero) }}">{{ c.numero }}</a></td>
+      <td>{{ c.pedido_codigo }}</td>
+      <td>{{ c.tipo.texto }}</td>
+      <td class="num">{{ c.monto_centimos | soles }}</td>
+      <td>{{ c.motivo }}</td>
+      <td>{{ c.operador }}</td>
+      <td>{{ c.creado_en | fecha }}</td>
+    </tr>
+    {% else %}
+    <tr id="sin-compensaciones"><td colspan="7">No hay compensaciones registradas.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

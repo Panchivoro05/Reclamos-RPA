@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block titulo %}Historial de compensaciones{% endblock %}
+{% block contenido %}
+<fieldset class="ventana">
+  <legend>Historial de compensaciones (ultimas 100)</legend>
+  {% include "_tabla_compensaciones.html" %}
+</fieldset>
+{% endblock %}
