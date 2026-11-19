@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "BurgerYa Reclamos",
-    "slug": "burgerya-reclamos",
+    "slug": "reclamos-rpa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -48,6 +48,12 @@
         }
       ]
     ],
-    "scheme": "burgerya"
+    "scheme": "burgerya",
+    "extra": {
+      "eas": {
+        "projectId": "41328781-abec-4c56-98fe-f9b55a2c7f2f"
+      }
+    },
+    "owner": "rofavicus-team"
   }
 }
