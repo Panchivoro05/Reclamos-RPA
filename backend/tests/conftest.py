@@ -140,3 +140,11 @@ def publicados(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, dict[str, obj
 
     monkeypatch.setattr("app.services.eventos._publicar", _anotar)
     return mensajes
+
+
+@pytest.fixture(autouse=True)
+def notificaciones_encoladas(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Ids de los eventos cuyas notificaciones se habrían encolado (sin Celery ni Valkey)."""
+    ids: list[int] = []
+    monkeypatch.setattr("app.services.eventos._encolar_notificacion", ids.append)
+    return ids

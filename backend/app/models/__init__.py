@@ -3,12 +3,16 @@ from app.models.cliente import Cliente
 from app.models.enums import (
     ActorEvento,
     BaseMonto,
+    CanalNotificacion,
     CategoriaProducto,
+    EstadoNotificacion,
     EstadoPedido,
     EstadoReclamo,
+    PlataformaDispositivo,
     SolucionCompensacion,
     TipoReclamo,
 )
+from app.models.notificacion import Dispositivo, Notificacion
 from app.models.pedido import Pedido, PedidoItem
 from app.models.producto import Producto
 from app.models.reclamo import (
@@ -24,13 +28,18 @@ __all__ = [
     "ActorEvento",
     "Base",
     "BaseMonto",
+    "CanalNotificacion",
     "CategoriaProducto",
     "Cliente",
+    "Dispositivo",
     "EjecucionBot",
+    "EstadoNotificacion",
     "EstadoPedido",
     "EstadoReclamo",
+    "Notificacion",
     "Pedido",
     "PedidoItem",
+    "PlataformaDispositivo",
     "PoliticaAntifraude",
     "Producto",
     "Reclamo",

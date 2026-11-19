@@ -17,6 +17,11 @@ class BotModo(StrEnum):
     SIMULADO = "simulado"
 
 
+class PushModo(StrEnum):
+    EXPO = "expo"  # Expo Push Service (llega al celular por FCM)
+    FALSO = "falso"  # solo se registra en el log (pruebas y desarrollo sin celular)
+
+
 class Settings(BaseSettings):
     """Configuración leída de variables de entorno (y del .env de la raíz si existe)."""
 
@@ -49,6 +54,12 @@ class Settings(BaseSettings):
     worker_bot_python: Path | None = None  # por defecto: <worker_bot_dir>/.venv/bin/python
     # Tiempo máximo de una ejecución del bot (el bot tiene su propio límite de 180 s).
     worker_bot_timeout_s: int = 240
+
+    # ---------- Notificaciones (fase 4) ----------
+    push_modo: PushModo = PushModo.FALSO
+    expo_push_url: str = "https://exp.host/--/api/v2/push/send"
+    # Opcional: solo si en expo.dev se activa "Enhanced Security for Push Notifications".
+    expo_access_token: str = ""
 
     @property
     def bot_python(self) -> Path:

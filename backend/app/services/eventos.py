@@ -1,4 +1,4 @@
-"""Aviso en tiempo real de cada cambio de estado de un reclamo (Valkey pub/sub).
+"""Aviso de cada cambio de estado de un reclamo: en vivo (Valkey pub/sub) y notificaciones.
 
 Quien cambia el estado (la API al crear el reclamo, el worker al procesarlo) llama a
 `publicar_cambio` DESPUÉS del commit: así nadie avisa de algo que todavía no está guardado.
@@ -72,15 +72,32 @@ def _publicar(canal: str, mensaje: str) -> None:
     _cliente_valkey().publish(canal, mensaje)
 
 
+def _encolar_notificacion(evento_id: int) -> None:
+    # Import diferido: la API no carga Celery hasta que hace falta.
+    from app.worker.notificaciones import enviar_notificaciones
+
+    enviar_notificaciones.apply_async(
+        args=[evento_id],
+        retry=True,
+        retry_policy={"max_retries": 1, "interval_start": 0, "interval_step": 0.5},
+    )
+
+
 def publicar_cambio(cambio: CambioEstado) -> bool:
-    """Publica el cambio en el canal del cliente. Devuelve False si Valkey no respondió."""
+    """Avisa el cambio a la app (pub/sub) y encola sus notificaciones (push).
+
+    Devuelve False si algo no llegó a Valkey. En ese caso el aviso o la notificación se
+    pierden, pero el cambio ya está guardado: el cliente lo verá al abrir la app.
+    """
+    ok = True
     try:
         _publicar(canal_cliente(cambio.cliente_id), json.dumps(cambio.mensaje()))
     except Exception:
-        logger.warning(
-            "No se pudo publicar el cambio de %s a %s (Valkey no responde)",
-            cambio.reclamo_codigo,
-            cambio.estado.value,
-        )
-        return False
-    return True
+        ok = False
+        logger.warning("No se pudo publicar el cambio de %s (Valkey)", cambio.reclamo_codigo)
+    try:
+        _encolar_notificacion(cambio.evento_id)
+    except Exception:
+        ok = False
+        logger.warning("No se pudo encolar la notificación de %s", cambio.reclamo_codigo)
+    return ok

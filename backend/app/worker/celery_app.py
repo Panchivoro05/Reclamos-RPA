@@ -2,7 +2,11 @@ from celery import Celery
 
 from app.core.config import get_settings
 
-celery_app = Celery("reclamos", broker=get_settings().valkey_url, include=["app.worker.tareas"])
+celery_app = Celery(
+    "reclamos",
+    broker=get_settings().valkey_url,
+    include=["app.worker.tareas", "app.worker.notificaciones"],
+)
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
@@ -14,7 +18,10 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
+    # Una sola terminal de caja: el worker del bot procesa un reclamo a la vez. El worker de
+    # notificaciones se lanza con más concurrencia (-c 4) y solo atiende su cola.
     worker_concurrency=1,
+    task_routes={"notificaciones.*": {"queue": "notificaciones"}},
     # Si Valkey no responde, la API no se queda colgada esperando para encolar.
     broker_connection_timeout=3,
     broker_connection_retry_on_startup=True,

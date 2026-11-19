@@ -64,3 +64,20 @@ class BaseMonto(StrEnum):
     FIJO = "fijo"  # el valor de la regla, en soles
     PORCENTAJE_TOTAL = "porcentaje_total"  # el valor de la regla, como % del total del pedido
     TOTAL_PEDIDO = "total_pedido"  # el total del pedido
+
+
+class PlataformaDispositivo(StrEnum):
+    ANDROID = "android"
+    IOS = "ios"
+
+
+class CanalNotificacion(StrEnum):
+    PUSH = "push"
+    CORREO = "correo"
+
+
+class EstadoNotificacion(StrEnum):
+    ENVIANDO = "enviando"  # se reservó el envío (evita duplicados si la tarea se repite)
+    ENVIADA = "enviada"
+    FALLIDA = "fallida"
+    OMITIDA = "omitida"  # no había a quién enviarla (sin dispositivos, sin correo...)
