@@ -21,10 +21,10 @@ se escalan a un agente humano.
 | 1 | Base del proyecto, pedidos y reclamos (API + app) | ✅ |
 | 2 | Sistema de caja antiguo + bot RPA | ✅ |
 | 3 | Automatización de punta a punta (Celery) | ✅ |
-| 4 | Tiempo real y notificaciones push (falta el aviso por correo) | En curso |
+| 4 | Tiempo real y notificaciones push (el aviso por correo pasa al cierre, fase 7) | ✅ |
 | 5 | IA con Gemini | Pendiente |
 | 6 | Panel web de supervisión | Pendiente |
-| 7 | DevOps completo | Pendiente |
+| 7 | DevOps completo, aviso por correo y cierre | Pendiente |
 
 ## Estructura
 

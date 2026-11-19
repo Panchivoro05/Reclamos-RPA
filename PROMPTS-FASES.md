@@ -183,6 +183,7 @@ Vamos a trabajar la FASE 4. Lee el CLAUDE.md.
 3) Aviso por correo (SMTP) en los hitos (recibido, resuelto, escalado), con plantilla HTML.
    Mailpit en Docker Compose para verlos en desarrollo. Interfaz NotificadorCorreo con
    implementación falsa para pruebas. (Reemplaza a WhatsApp Cloud API: decidido en la fase 4.)
+   → Se movió al final del proyecto (fase 7, punto 7).
 Primero el plan.
 ```
 
@@ -228,5 +229,7 @@ Vamos a trabajar la FASE 7. Lee el CLAUDE.md.
 4) Build de la app con EAS (APK).
 5) Script de evaluación que simule N reclamos y mida los indicadores del objetivo específico 7.
 6) Documentación final de arquitectura y despliegue.
+7) Aviso por correo (movido desde la fase 4): SMTP en los hitos (recibido, resuelto, escalado),
+   plantilla HTML, Mailpit en Compose, interfaz NotificadorCorreo con implementación falsa.
 Primero el plan.
 ```
