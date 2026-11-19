@@ -149,10 +149,16 @@ def _procesar(reclamo_id: int, ia: Any, carpeta: Any = None, **opciones: Any) ->
 
 
 def _llamadas(reclamo_id: int) -> list[LlamadaIA]:
+    """Llamadas del análisis (sin las de redactar mensajes, que se prueban aparte)."""
     with SessionLocal() as session:
         return list(
             session.scalars(
-                select(LlamadaIA).where(LlamadaIA.reclamo_id == reclamo_id).order_by(LlamadaIA.id)
+                select(LlamadaIA)
+                .where(
+                    LlamadaIA.reclamo_id == reclamo_id,
+                    LlamadaIA.operacion != OperacionIA.REDACTAR_MENSAJE,
+                )
+                .order_by(LlamadaIA.id)
             )
         )
 

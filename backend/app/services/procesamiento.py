@@ -15,6 +15,7 @@ from enum import StrEnum
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.moneda import formato_soles
 from app.core.tiempo import ahora_utc
 from app.models import (
     ActorEvento,
@@ -41,8 +42,14 @@ from app.services.bot import EjecutorBot, ResultadoBot, SolicitudBot
 from app.services.eventos import CambioEstado, publicar_cambio
 from app.services.evidencia import guardar_evidencia
 from app.services.ia import ErrorIA, ProveedorIA
+from app.services.mensajes import redactar
 from app.services.reglas import obtener_politica
-from app.services.resolucion import Decision, decidir, describir_compensacion
+from app.services.resolucion import (
+    SOLUCIONES_CON_DINERO,
+    Decision,
+    decidir,
+    describir_compensacion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +129,7 @@ def procesar_reclamo(
                     session.rollback()
                     return Resultado.SIN_CAMBIOS
                 return _escalar(
-                    session, reclamo, f"No se pudo completar el análisis con IA: {error}"
+                    session, reclamo, f"No se pudo completar el análisis con IA: {error}", ia
                 )
             reclamo = _bloquear(session, reclamo_id)
             if reclamo is None or reclamo.estado != EstadoReclamo.EN_VALIDACION:
@@ -131,15 +138,25 @@ def procesar_reclamo(
                 return Resultado.SIN_CAMBIOS
         decision = _decidir_con_analisis(session, reclamo, foto, analisis)
         if not decision.aprobada or decision.solucion is None:
-            return _escalar(session, reclamo, str(decision.motivo_escalamiento))
+            return _escalar(session, reclamo, str(decision.motivo_escalamiento), ia)
         reclamo.solucion = decision.solucion
         reclamo.monto_compensacion = decision.monto
+        plantilla = (
+            f"¡Tu reclamo fue aprobado! Te corresponde "
+            f"{describir_compensacion(decision.solucion, decision.monto)}."
+        )
         _cambiar_estado(
             session,
             reclamo,
             EstadoReclamo.VALIDADO,
-            f"¡Tu reclamo fue aprobado! Te corresponde "
-            f"{describir_compensacion(decision.solucion, decision.monto)}.",
+            redactar(
+                session,
+                reclamo,
+                EstadoReclamo.VALIDADO,
+                plantilla,
+                _datos_obligatorios(reclamo),
+                ia,
+            ),
         )
         reclamo = _bloquear(session, reclamo_id)
         assert reclamo is not None
@@ -174,12 +191,21 @@ def procesar_reclamo(
         assert reclamo.solucion is not None and reclamo.monto_compensacion is not None
         reclamo.numero_operacion = resultado.numero_operacion
         descripcion = describir_compensacion(reclamo.solucion, reclamo.monto_compensacion)
+        plantilla = (
+            f"¡Listo! Registramos {descripcion}. Número de operación: {resultado.numero_operacion}."
+        )
         _cambiar_estado(
             session,
             reclamo,
             EstadoReclamo.RESUELTO,
-            f"¡Listo! Registramos {descripcion}. "
-            f"Número de operación: {resultado.numero_operacion}.",
+            redactar(
+                session,
+                reclamo,
+                EstadoReclamo.RESUELTO,
+                plantilla,
+                [*_datos_obligatorios(reclamo), str(resultado.numero_operacion)],
+                ia,
+            ),
             actor=ActorEvento.BOT,
         )
         return Resultado.RESUELTO
@@ -195,6 +221,7 @@ def procesar_reclamo(
         session,
         reclamo,
         f"El bot no pudo registrar la compensación ({resultado.codigo_error}): {resultado.mensaje}",
+        ia,
     )
 
 
@@ -273,9 +300,20 @@ def _cambiar_estado(
     publicar_cambio(CambioEstado.desde_evento(reclamo, evento))
 
 
-def _escalar(session: Session, reclamo: Reclamo, motivo: str) -> Resultado:
+def _datos_obligatorios(reclamo: Reclamo) -> list[str]:
+    """Lo que el mensaje redactado por la IA debe repetir tal cual (el monto, si lo hay)."""
+    if reclamo.solucion in SOLUCIONES_CON_DINERO and reclamo.monto_compensacion is not None:
+        return [formato_soles(reclamo.monto_compensacion)]
+    return []
+
+
+def _escalar(
+    session: Session, reclamo: Reclamo, motivo: str, ia: ProveedorIA | None = None
+) -> Resultado:
     reclamo.motivo_escalamiento = motivo
-    _cambiar_estado(session, reclamo, EstadoReclamo.ESCALADO, MENSAJE_ESCALADO)
+    # La IA no recibe el motivo: es interno (para el agente), el cliente no debe verlo.
+    mensaje = redactar(session, reclamo, EstadoReclamo.ESCALADO, MENSAJE_ESCALADO, [], ia)
+    _cambiar_estado(session, reclamo, EstadoReclamo.ESCALADO, mensaje)
     logger.warning("Reclamo %s escalado: %s", reclamo.codigo, motivo)
     return Resultado.ESCALADO
 

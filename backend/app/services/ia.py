@@ -17,7 +17,7 @@ from typing import Protocol
 from pydantic import BaseModel, Field
 
 from app.core.config import IAModo, get_settings
-from app.models import TipoReclamo
+from app.models import EstadoReclamo, TipoReclamo
 
 
 class ErrorIA(Exception):
@@ -46,6 +46,18 @@ class EntradaFoto:
     productos_reclamados: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class EntradaMensaje:
+    """Para redactar el mensaje de un hito. `mensaje_base` es la plantilla con los datos
+    correctos: la IA solo puede reescribirla, nunca agregar datos (lo verifica `mensajes.py`).
+    No lleva el motivo interno de un escalamiento: el cliente no debe verlo."""
+
+    estado: EstadoReclamo
+    tipo: TipoReclamo
+    productos_reclamados: list[str]
+    mensaje_base: str
+
+
 # ---------- Lo que responde (validado) ----------
 
 
@@ -66,6 +78,10 @@ class AnalisisFoto(BaseModel):
     coherente: bool  # la foto muestra lo que el cliente describe
     descripcion: str = Field(description="Qué se ve en la foto, en una frase")
     confianza: float = Field(ge=0, le=1)
+
+
+class MensajeRedactado(BaseModel):
+    mensaje: str = Field(description="El mensaje para el cliente, en una o dos frases")
 
 
 @dataclass(frozen=True)
@@ -89,6 +105,8 @@ class ProveedorIA(Protocol):
     def clasificar_texto(self, entrada: EntradaTexto) -> RespuestaIA[AnalisisTexto]: ...
 
     def analizar_foto(self, entrada: EntradaFoto) -> RespuestaIA[AnalisisFoto]: ...
+
+    def redactar_mensaje(self, entrada: EntradaMensaje) -> RespuestaIA[MensajeRedactado]: ...
 
 
 # ---------- Proveedor simulado ----------
@@ -162,11 +180,14 @@ class ProveedorSimulado:
         self,
         texto: Callable[[EntradaTexto], AnalisisTexto] | None = None,
         foto: Callable[[EntradaFoto], AnalisisFoto] | None = None,
+        mensaje: Callable[[EntradaMensaje], MensajeRedactado] | None = None,
     ) -> None:
         self._texto = texto
         self._foto = foto
+        self._mensaje = mensaje
         self.entradas_texto: list[EntradaTexto] = []
         self.entradas_foto: list[EntradaFoto] = []
+        self.entradas_mensaje: list[EntradaMensaje] = []
 
     def clasificar_texto(self, entrada: EntradaTexto) -> RespuestaIA[AnalisisTexto]:
         self.entradas_texto.append(entrada)
@@ -187,9 +208,25 @@ class ProveedorSimulado:
         )
         return RespuestaIA(analisis, self._uso(entrada.descripcion))
 
+    def redactar_mensaje(self, entrada: EntradaMensaje) -> RespuestaIA[MensajeRedactado]:
+        self.entradas_mensaje.append(entrada)
+        if self._mensaje:
+            redactado = self._mensaje(entrada)
+        else:
+            saludo = SALUDOS_SIMULADOS.get(entrada.estado, "")
+            redactado = MensajeRedactado(mensaje=f"{saludo} {entrada.mensaje_base}".strip())
+        return RespuestaIA(redactado, self._uso(entrada.mensaje_base))
+
     def _uso(self, texto: str) -> Uso:
         # Aproximación de tokens (≈ 4 caracteres por token) para que el registro tenga datos.
         return Uso(self.modelo, tokens_entrada=len(texto) // 4 + 50, tokens_salida=40)
+
+
+SALUDOS_SIMULADOS = {
+    EstadoReclamo.VALIDADO: "¡Buenas noticias!",
+    EstadoReclamo.RESUELTO: "¡Gracias por tu paciencia!",
+    EstadoReclamo.ESCALADO: "Lamentamos el inconveniente.",
+}
 
 
 def clasificar_por_palabras(entrada: EntradaTexto) -> AnalisisTexto:
@@ -243,5 +280,8 @@ def get_proveedor_ia() -> ProveedorIA:
             from app.services.ia_gemini import ProveedorGemini
 
             return ProveedorGemini(
-                settings.gemini_api_key, settings.ia_modelo, timeout_s=settings.ia_timeout_s
+                settings.gemini_api_key,
+                settings.ia_modelo,
+                timeout_s=settings.ia_timeout_s,
+                timeout_mensaje_s=settings.ia_timeout_mensaje_s,
             )

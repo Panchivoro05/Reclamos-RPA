@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     ia_modelo: str = "gemini-3.5-flash-lite"
     # Con alta demanda, Gemini llegó a tardar ~60 s en responder (medido en desarrollo).
     ia_timeout_s: float = 60
+    # Redactar un mensaje no puede demorar el reclamo: si tarda más, se usa la plantilla.
+    ia_timeout_mensaje_s: float = 15
     # Precio del modelo en USD por millón de tokens: solo para estimar el costo de cada llamada.
     # Valores de gemini-3.5-flash-lite (plan de pago); en el plan gratuito no se cobra.
     ia_precio_entrada_usd_millon: float = 0.30

@@ -23,8 +23,10 @@ from app.services.ia import (
     AnalisisFoto,
     AnalisisTexto,
     EntradaFoto,
+    EntradaMensaje,
     EntradaTexto,
     ErrorIA,
+    MensajeRedactado,
     RespuestaIA,
     Uso,
 )
@@ -71,6 +73,19 @@ que falta). Una foto que no tiene relación con el reclamo no es coherente.
 {REGLA_DATOS}"""
 
 
+INSTRUCCIONES_MENSAJE = """Eres quien atiende a los clientes de BurgerYa, una cadena de comida \
+rápida con delivery en Lima. Reescribe el mensaje base para el cliente con un tono cordial, \
+cercano y breve (una o dos frases), en español de Perú, tuteando.
+
+Reglas estrictas:
+- Copia EXACTAMENTE los montos (por ejemplo "S/ 27.90") y los códigos (por ejemplo \
+"CMP-000012") del mensaje base, sin cambiarles el formato.
+- No agregues datos que no estén en el mensaje base: ni montos, ni plazos, ni promesas, ni \
+números, ni enlaces.
+- No menciones procesos internos (revisiones antifraude, inteligencia artificial, reglas).
+- Puedes pedir disculpas por el inconveniente y agradecer la paciencia."""
+
+
 class ModelosGemini(Protocol):
     """Lo único que se usa del cliente de Gemini (las pruebas pasan uno falso)."""
 
@@ -88,9 +103,11 @@ class ProveedorGemini:
         modelo: str,
         *,
         timeout_s: float = 60,
+        timeout_mensaje_s: float = 15,
         modelos: ModelosGemini | None = None,
     ) -> None:
         self.modelo = modelo
+        self.timeout_mensaje_s = timeout_mensaje_s
         if modelos is None:
             if not api_key:
                 raise ValueError("Falta GEMINI_API_KEY (IA_MODO=gemini)")
@@ -128,8 +145,30 @@ class ProveedorGemini:
         ]
         return self._generar(contenido, INSTRUCCIONES_FOTO, AnalisisFoto)
 
+    def redactar_mensaje(self, entrada: EntradaMensaje) -> RespuestaIA[MensajeRedactado]:
+        contenido = (
+            f"Situación: el reclamo pasó a '{entrada.estado.value}' "
+            f"(tipo {entrada.tipo.value}; productos: {', '.join(entrada.productos_reclamados)})\n"
+            f"Mensaje base: {entrada.mensaje_base}"
+        )
+        # Un poco de variedad en el tono; los datos los verifica mensajes.py. Tiempo corto:
+        # si tarda, se usa la plantilla y el reclamo sigue.
+        return self._generar(
+            contenido,
+            INSTRUCCIONES_MENSAJE,
+            MensajeRedactado,
+            temperatura=0.5,
+            timeout_s=self.timeout_mensaje_s,
+        )
+
     def _generar[T: BaseModel](
-        self, contenido: Any, instrucciones: str, esquema: type[T]
+        self,
+        contenido: Any,
+        instrucciones: str,
+        esquema: type[T],
+        *,
+        temperatura: float = 0,
+        timeout_s: float | None = None,
     ) -> RespuestaIA[T]:
         config = types.GenerateContentConfig(
             system_instruction=instrucciones,
@@ -137,8 +176,16 @@ class ProveedorGemini:
             response_json_schema=esquema.model_json_schema(),
             # Clasificar no necesita creatividad ni razonamiento largo: respuestas estables,
             # más rápidas y baratas.
-            temperature=0,
+            temperature=temperatura,
             thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
+            http_options=(
+                types.HttpOptions(
+                    timeout=int(timeout_s * 1000),
+                    retry_options=types.HttpRetryOptions(attempts=1),
+                )
+                if timeout_s
+                else None
+            ),
         )
         try:
             respuesta = self._modelos.generate_content(
