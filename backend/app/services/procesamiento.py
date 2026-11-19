@@ -29,6 +29,7 @@ from app.models import (
 )
 from app.services.almacenamiento import AlmacenamientoArchivos
 from app.services.bot import EjecutorBot, ResultadoBot, SolicitudBot
+from app.services.eventos import CambioEstado, publicar_cambio
 from app.services.evidencia import guardar_evidencia
 from app.services.resolucion import decidir, describir_compensacion
 
@@ -198,9 +199,12 @@ def _cambiar_estado(
     actor: ActorEvento = ActorEvento.SISTEMA,
 ) -> None:
     reclamo.estado = estado
-    session.add(ReclamoEvento(reclamo_id=reclamo.id, estado=estado, mensaje=mensaje, actor=actor))
+    evento = ReclamoEvento(reclamo_id=reclamo.id, estado=estado, mensaje=mensaje, actor=actor)
+    session.add(evento)
     session.commit()
     logger.info("Reclamo %s → %s", reclamo.codigo, estado.value)
+    # Después del commit: la app solo se entera de lo que ya está guardado.
+    publicar_cambio(CambioEstado.desde_evento(reclamo, evento))
 
 
 def _escalar(session: Session, reclamo: Reclamo, motivo: str) -> Resultado:

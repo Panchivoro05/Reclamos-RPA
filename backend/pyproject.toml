@@ -22,6 +22,8 @@ dependencies = [
     "httpx>=0.28",
     # Cola de trabajos. Valkey habla el protocolo de Redis: se usa el transporte "redis".
     "celery[redis]>=5.5",
+    # Cliente de Valkey para pub/sub (eventos en tiempo real); ya lo trae Celery.
+    "redis>=5.2",
 ]
 
 [project.optional-dependencies]

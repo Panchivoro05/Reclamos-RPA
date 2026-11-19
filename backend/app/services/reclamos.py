@@ -27,6 +27,7 @@ from app.models import (
 from app.models.enums import ESTADOS_RECLAMO_ABIERTO
 from app.schemas.reclamo import ReclamoItemEntrada
 from app.services.almacenamiento import PATRON_NOMBRE, AlmacenamientoArchivos
+from app.services.eventos import CambioEstado, publicar_cambio
 from app.services.pedidos import obtener_pedido
 from app.services.reglas import tipos_con_foto_obligatoria
 
@@ -251,6 +252,7 @@ def crear_reclamo(
             raise _reclamo_duplicado() from error
         raise
 
+    publicar_cambio(CambioEstado.desde_evento(reclamo, reclamo.eventos[0]))
     return obtener_reclamo(session, cliente, reclamo.codigo)
 
 

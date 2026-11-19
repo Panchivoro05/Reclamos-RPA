@@ -6,6 +6,7 @@ migraciones de Alembic al iniciar la sesión de pytest, y las tablas se vacían 
 de cada prueba. La base de desarrollo nunca se toca.
 """
 
+import json
 import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -127,3 +128,15 @@ def encolados(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     ids: list[int] = []
     monkeypatch.setattr("app.services.cola._enviar", ids.append)
     return ids
+
+
+@pytest.fixture(autouse=True)
+def publicados(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, dict[str, object]]]:
+    """Los eventos en tiempo real tampoco van a Valkey: se anotan como (canal, mensaje)."""
+    mensajes: list[tuple[str, dict[str, object]]] = []
+
+    def _anotar(canal: str, mensaje: str) -> None:
+        mensajes.append((canal, json.loads(mensaje)))
+
+    monkeypatch.setattr("app.services.eventos._publicar", _anotar)
+    return mensajes
