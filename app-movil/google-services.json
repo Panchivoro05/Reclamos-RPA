@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "598832610317",
+    "project_id": "burgerya-reclamos-9ea79",
+    "storage_bucket": "burgerya-reclamos-9ea79.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:598832610317:android:0e0033ff86e4ac9cc4e944",
+        "android_client_info": {
+          "package_name": "pe.burgerya.reclamos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAjRmJDIC4zt7A6yxywsw9u0LtSN2oQVw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
