@@ -280,6 +280,7 @@ def obtener_reclamo(session: Session, cliente: Cliente, codigo: str) -> Reclamo:
             selectinload(Reclamo.pedido),
             selectinload(Reclamo.items),
             selectinload(Reclamo.eventos),
+            selectinload(Reclamo.ejecuciones_bot),
         )
         .execution_options(populate_existing=True)
     )
@@ -288,6 +289,23 @@ def obtener_reclamo(session: Session, cliente: Cliente, codigo: str) -> Reclamo:
             "reclamo_no_encontrado", f"No encontramos el reclamo {codigo} en tu cuenta."
         )
     return reclamo
+
+
+def obtener_video(
+    session: Session, almacenamiento: AlmacenamientoArchivos, cliente: Cliente, codigo: str
+) -> bytes:
+    """Video del bot resolviendo el reclamo (la última ejecución exitosa). Solo para su dueño."""
+    reclamo = obtener_reclamo(session, cliente, codigo)
+    no_disponible = NoEncontrado(
+        "video_no_disponible", "Todavía no hay un video de la resolución de este reclamo."
+    )
+    exitosas = [e for e in reclamo.ejecuciones_bot if e.exito and e.video]
+    if not exitosas:
+        raise no_disponible
+    contenido = almacenamiento.leer_evidencia(exitosas[-1].video or "")
+    if contenido is None:
+        raise no_disponible
+    return contenido
 
 
 def obtener_foto(

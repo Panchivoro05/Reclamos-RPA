@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch, type UseFormSetError } from 'react-hook-form';
 import {
   Alert,
@@ -15,17 +15,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { z } from 'zod';
 
 import { ApiError } from '@/api/cliente';
 import { useCrearReclamo, usePedido } from '@/api/consultas';
 import type { PedidoDetalle, TipoReclamo } from '@/api/tipos';
 import { Boton } from '@/components/Boton';
 import { AvisoError, Cargando, ErrorPantalla, mensajeDeError } from '@/components/EstadosPantalla';
-import { aNuevoReclamo, esquemaReclamo, type ValoresReclamo } from '@/features/reclamos/esquema';
+import {
+  aNuevoReclamo,
+  crearEsquemaReclamo,
+  type SalidaReclamo,
+  type ValoresReclamo,
+} from '@/features/reclamos/esquema';
 import { TIPOS_RECLAMO_INFO } from '@/lib/catalogos';
-
-type SalidaReclamo = z.output<typeof esquemaReclamo>;
 
 export default function NuevoReclamo() {
   const { pedido: codigo } = useLocalSearchParams<{ pedido: string }>();
@@ -72,6 +74,8 @@ function Formulario({ pedido }: { pedido: PedidoDetalle }) {
   const crear = useCrearReclamo();
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const disponibles = pedido.tipos_reclamo_disponibles;
+  const tiposConFoto = pedido.tipos_con_foto_obligatoria;
+  const esquema = useMemo(() => crearEsquemaReclamo(tiposConFoto), [tiposConFoto]);
 
   const {
     control,
@@ -80,7 +84,7 @@ function Formulario({ pedido }: { pedido: PedidoDetalle }) {
     setError,
     formState: { errors },
   } = useForm<ValoresReclamo, unknown, SalidaReclamo>({
-    resolver: zodResolver(esquemaReclamo),
+    resolver: zodResolver(esquema),
     defaultValues: {
       tipo: disponibles.length === 1 ? disponibles[0] : undefined,
       descripcion: '',
@@ -95,7 +99,7 @@ function Formulario({ pedido }: { pedido: PedidoDetalle }) {
 
   const tipo = useWatch({ control, name: 'tipo' });
   const foto = useWatch({ control, name: 'foto' });
-  const fotoObligatoria = tipo ? TIPOS_RECLAMO_INFO[tipo].fotoObligatoria : false;
+  const fotoObligatoria = tipo ? tiposConFoto.includes(tipo) : false;
 
   const enviar = handleSubmit((valores) => {
     setErrorGeneral(null);

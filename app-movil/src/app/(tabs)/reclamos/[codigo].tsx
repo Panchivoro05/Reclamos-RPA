@@ -1,11 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { urlApi } from '@/api/cliente';
 import { useReclamo } from '@/api/consultas';
-import type { ReclamoDetalle, ReclamoEvento } from '@/api/tipos';
+import type { ReclamoDetalle, ReclamoEvento, Resolucion } from '@/api/tipos';
+import { Boton } from '@/components/Boton';
 import { Cargando, ErrorPantalla } from '@/components/EstadosPantalla';
 import { Insignia } from '@/components/Insignia';
 import { Tarjeta } from '@/components/Tarjeta';
@@ -32,6 +35,12 @@ export default function DetalleReclamo() {
           }
         >
           <Datos reclamo={reclamo} />
+          {reclamo.resolucion && (
+            <TarjetaResolucion
+              resolucion={reclamo.resolucion}
+              registrada={reclamo.estado === 'resuelto' || reclamo.estado === 'cerrado'}
+            />
+          )}
           {reclamo.foto_url && <Foto ruta={reclamo.foto_url} />}
           <LineaDeTiempo eventos={reclamo.eventos} />
         </ScrollView>
@@ -66,6 +75,86 @@ function Datos({ reclamo }: { reclamo: ReclamoDetalle }) {
         </View>
       )}
     </Tarjeta>
+  );
+}
+
+/** Primera letra en mayúscula: "un reembolso de S/ 8.90" → "Un reembolso de S/ 8.90". */
+function capitalizar(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function TarjetaResolucion({
+  resolucion,
+  registrada,
+}: {
+  resolucion: Resolucion;
+  registrada: boolean;
+}) {
+  const [verVideo, setVerVideo] = useState(false);
+  return (
+    <Tarjeta className="gap-3 border-emerald-200 bg-emerald-50">
+      <View className="flex-row items-center gap-3">
+        <Ionicons
+          name={registrada ? 'checkmark-circle' : 'hourglass-outline'}
+          size={26}
+          color="#047857"
+        />
+        <Text className="flex-1 text-base font-bold text-emerald-900">
+          {registrada ? 'Así resolvimos tu reclamo' : 'Te corresponde'}
+        </Text>
+      </View>
+      <Text className="text-lg font-semibold text-neutral-900">
+        {capitalizar(resolucion.descripcion)}
+      </Text>
+      {resolucion.numero_operacion ? (
+        <Text className="text-neutral-700">
+          Operación en caja: <Text className="font-semibold">{resolucion.numero_operacion}</Text>
+        </Text>
+      ) : (
+        <Text className="text-neutral-700">Lo estamos registrando en nuestro sistema de caja…</Text>
+      )}
+      {resolucion.video_url &&
+        (verVideo ? (
+          <VideoResolucion ruta={resolucion.video_url} />
+        ) : (
+          <Boton
+            titulo="Ver cómo lo resolvimos"
+            icono="play-circle-outline"
+            variante="secundario"
+            onPress={() => setVerVideo(true)}
+          />
+        ))}
+    </Tarjeta>
+  );
+}
+
+function VideoResolucion({ ruta }: { ruta: string }) {
+  // El video es privado: se pide con la misma sesión que el resto de la API.
+  const encabezados = useEncabezadosAuth();
+  return (
+    <View className="gap-2">
+      <Text className="text-sm text-neutral-600">
+        Nuestro asistente automático (bot RPA) registró tu compensación en el sistema de caja, como
+        lo haría un cajero. Así se vio:
+      </Text>
+      {encabezados && <Reproductor uri={urlApi(ruta)} encabezados={encabezados} />}
+    </View>
+  );
+}
+
+function Reproductor({ uri, encabezados }: { uri: string; encabezados: Record<string, string> }) {
+  const player = useVideoPlayer({ uri, headers: encabezados }, (reproductor) => {
+    reproductor.play();
+  });
+  return (
+    <VideoView
+      player={player}
+      nativeControls
+      contentFit="contain"
+      fullscreenOptions={{ enable: true }}
+      accessibilityLabel="Video del bot registrando la compensación"
+      style={{ width: '100%', aspectRatio: 1280 / 800, borderRadius: 12, backgroundColor: '#000' }}
+    />
   );
 }
 

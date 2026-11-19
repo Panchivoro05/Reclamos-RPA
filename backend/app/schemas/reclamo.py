@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Self
 
 from pydantic import BaseModel, Field
@@ -9,10 +10,23 @@ from app.models import (
     Reclamo,
     ReclamoEvento,
     ReclamoItem,
+    SolucionCompensacion,
     TipoReclamo,
 )
+from app.services.resolucion import describir_compensacion
 
 RUTA_ARCHIVOS = "/api/v1/archivos"
+RUTA_RECLAMOS = "/api/v1/reclamos"
+
+# Estados en los que el cliente ve la compensación que le corresponde.
+ESTADOS_CON_RESOLUCION = frozenset(
+    {
+        EstadoReclamo.VALIDADO,
+        EstadoReclamo.EN_RESOLUCION,
+        EstadoReclamo.RESUELTO,
+        EstadoReclamo.CERRADO,
+    }
+)
 
 
 class ReclamoItemEntrada(BaseModel):
@@ -70,12 +84,41 @@ class ReclamoResumen(BaseModel):
         )
 
 
+class ResolucionOut(BaseModel):
+    """Lo que el cliente recibe. Nunca incluye el motivo interno de escalamiento."""
+
+    solucion: SolucionCompensacion
+    monto: Decimal
+    descripcion: str  # "un reembolso de S/ 8.90"
+    numero_operacion: str | None
+    # Video del bot registrando la compensación (ruta relativa a la API, con sesión).
+    video_url: str | None
+
+    @classmethod
+    def desde(cls, reclamo: Reclamo) -> Self | None:
+        if (
+            reclamo.estado not in ESTADOS_CON_RESOLUCION
+            or reclamo.solucion is None
+            or reclamo.monto_compensacion is None
+        ):
+            return None
+        con_video = any(e.exito and e.video for e in reclamo.ejecuciones_bot)
+        return cls(
+            solucion=reclamo.solucion,
+            monto=reclamo.monto_compensacion,
+            descripcion=describir_compensacion(reclamo.solucion, reclamo.monto_compensacion),
+            numero_operacion=reclamo.numero_operacion,
+            video_url=f"{RUTA_RECLAMOS}/{reclamo.codigo}/video" if con_video else None,
+        )
+
+
 class ReclamoDetalle(ReclamoResumen):
     descripcion: str
     # Ruta relativa a la API; la app le antepone EXPO_PUBLIC_API_URL y envía su sesión.
     foto_url: str | None
     items: list[ReclamoItemOut]
     eventos: list[ReclamoEventoOut]
+    resolucion: ResolucionOut | None
 
     @classmethod
     def desde_reclamo(cls, reclamo: Reclamo) -> Self:
@@ -85,4 +128,5 @@ class ReclamoDetalle(ReclamoResumen):
             foto_url=f"{RUTA_ARCHIVOS}/{reclamo.foto_ruta}" if reclamo.foto_ruta else None,
             items=[ReclamoItemOut.desde(item) for item in reclamo.items],
             eventos=[ReclamoEventoOut.desde(evento) for evento in reclamo.eventos],
+            resolucion=ResolucionOut.desde(reclamo),
         )

@@ -1,4 +1,7 @@
-import { aNuevoReclamo, esquemaReclamo, type ValoresReclamo } from './esquema';
+import { aNuevoReclamo, crearEsquemaReclamo, type ValoresReclamo } from './esquema';
+
+// Como lo configura el backend por defecto (reglas_resolucion.requiere_foto).
+const esquemaReclamo = crearEsquemaReclamo(['producto_equivocado', 'mal_estado']);
 
 const base: ValoresReclamo = {
   tipo: 'pedido_incompleto',
@@ -41,6 +44,14 @@ describe('esquemaReclamo', () => {
   it.each(['producto_equivocado', 'mal_estado'] as const)('exige foto en %s', (tipo) => {
     expect(mensajes({ ...base, tipo })).toHaveProperty('foto');
     expect(mensajes({ ...base, tipo, foto })).toEqual({});
+  });
+
+  it('la foto obligatoria sigue la lista que envía el backend', () => {
+    const otraRegla = crearEsquemaReclamo(['pedido_incompleto']);
+    const resultado = otraRegla.safeParse(base);
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues[0]?.path).toEqual(['foto']);
+    expect(otraRegla.safeParse({ ...base, tipo: 'mal_estado' }).success).toBe(true);
   });
 
   it('rechaza fotos de más de 5 MB', () => {

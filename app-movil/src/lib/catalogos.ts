@@ -88,7 +88,6 @@ export interface InfoTipoReclamo {
   etiqueta: string;
   descripcion: string;
   icono: NombreIcono;
-  fotoObligatoria: boolean;
 }
 
 export const TIPOS_RECLAMO_INFO: Record<TipoReclamo, InfoTipoReclamo> = {
@@ -96,24 +95,20 @@ export const TIPOS_RECLAMO_INFO: Record<TipoReclamo, InfoTipoReclamo> = {
     etiqueta: 'Producto equivocado',
     descripcion: 'Me llegó algo distinto a lo que pedí.',
     icono: 'swap-horizontal',
-    fotoObligatoria: true,
   },
   pedido_incompleto: {
     etiqueta: 'Pedido incompleto',
     descripcion: 'Faltó uno o más productos.',
     icono: 'bag-remove-outline',
-    fotoObligatoria: false,
   },
   mal_estado: {
     etiqueta: 'Producto en mal estado',
     descripcion: 'Llegó frío, aplastado o derramado.',
     icono: 'warning-outline',
-    fotoObligatoria: true,
   },
   demora: {
     etiqueta: 'Demora en la entrega',
     descripcion: 'Mi pedido tardó demasiado o no llega.',
     icono: 'time-outline',
-    fotoObligatoria: false,
   },
 };

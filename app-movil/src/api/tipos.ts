@@ -15,6 +15,8 @@ export type EstadoReclamo =
 
 export type ActorEvento = 'cliente' | 'sistema' | 'bot' | 'ia' | 'agente';
 
+export type SolucionCompensacion = 'reenvio' | 'reembolso_parcial' | 'reembolso_total' | 'cupon';
+
 export type CategoriaProducto = 'hamburguesa' | 'combo' | 'acompañamiento' | 'bebida' | 'postre';
 
 /** Los montos llegan como texto ("82.50") para no perder precisión. */
@@ -50,6 +52,8 @@ export interface PedidoDetalle extends PedidoResumen {
   direccion_entrega: string;
   items: PedidoItem[];
   tipos_reclamo_disponibles: TipoReclamo[];
+  /** Tipos que exigen foto, según las reglas configuradas en el backend. */
+  tipos_con_foto_obligatoria: TipoReclamo[];
 }
 
 export interface ReclamoResumen {
@@ -74,11 +78,23 @@ export interface ReclamoEvento {
   creado_en: string;
 }
 
+/** Compensación que le corresponde al cliente (desde que el reclamo se aprueba). */
+export interface Resolucion {
+  solucion: SolucionCompensacion;
+  monto: Monto;
+  /** Texto listo para mostrar: "un reembolso de S/ 8.90". */
+  descripcion: string;
+  numero_operacion: string | null;
+  /** Video del bot registrando la compensación (ruta relativa a la API, con sesión). */
+  video_url: string | null;
+}
+
 export interface ReclamoDetalle extends ReclamoResumen {
   descripcion: string;
   foto_url: string | null;
   items: ReclamoItem[];
   eventos: ReclamoEvento[];
+  resolucion: Resolucion | null;
 }
 
 /** Cuerpo de los errores del backend: {"detail", "codigo", "errores"?}. */

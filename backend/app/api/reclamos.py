@@ -52,6 +52,23 @@ def obtener_reclamo(db: DbSession, cliente: ClienteActual, codigo: str) -> Recla
 
 
 @router.get(
+    "/reclamos/{codigo}/video",
+    response_class=Response,
+    responses={200: {"content": {"video/webm": {}}}},
+)
+def obtener_video(
+    db: DbSession, cliente: ClienteActual, almacenamiento: Almacenamiento, codigo: str
+) -> Response:
+    """Video del bot registrando la compensación; solo lo ve el dueño del reclamo."""
+    contenido = reclamos.obtener_video(db, almacenamiento, cliente, codigo)
+    return Response(
+        content=contenido,
+        media_type="video/webm",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.get(
     "/archivos/{nombre}",
     response_class=Response,
     responses={200: {"content": {"image/jpeg": {}, "image/png": {}, "image/webp": {}}}},

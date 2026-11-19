@@ -6,6 +6,7 @@ import { File } from 'expo-file-system';
 import { api } from './cliente';
 import type {
   Cliente,
+  EstadoReclamo,
   PedidoDetalle,
   PedidoResumen,
   ReclamoDetalle,
@@ -43,10 +44,24 @@ export function useReclamos() {
   });
 }
 
+/** Estados en los que el worker todavía está trabajando el reclamo. */
+const ESTADOS_EN_PROCESO = new Set<EstadoReclamo>([
+  'recibido',
+  'en_validacion',
+  'validado',
+  'en_resolucion',
+]);
+
 export function useReclamo(codigo: string) {
   return useQuery({
     queryKey: claves.reclamo(codigo),
     queryFn: () => api<ReclamoDetalle>(`/reclamos/${encodeURIComponent(codigo)}`),
+    // Mientras se procesa, se consulta cada 3 s para ver avanzar los estados.
+    // (En la fase 4 esto lo reemplaza el WebSocket.)
+    refetchInterval: (consulta) => {
+      const estado = consulta.state.data?.estado;
+      return estado && ESTADOS_EN_PROCESO.has(estado) ? 3000 : false;
+    },
   });
 }
 
