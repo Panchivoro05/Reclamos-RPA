@@ -105,3 +105,12 @@ export interface CuerpoError {
   codigo: string;
   errores?: { campo: string; mensaje: string }[];
 }
+
+export interface MensajeChat {
+  rol: 'cliente' | 'asistente';
+  texto: string;
+}
+
+export interface RespuestaAsistente {
+  respuesta: string;
+}

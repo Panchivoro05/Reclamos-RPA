@@ -7,10 +7,12 @@ import { api } from './cliente';
 import type {
   Cliente,
   EstadoReclamo,
+  MensajeChat,
   PedidoDetalle,
   PedidoResumen,
   ReclamoDetalle,
   ReclamoResumen,
+  RespuestaAsistente,
   TipoReclamo,
 } from './tipos';
 
@@ -106,5 +108,17 @@ export function useCrearReclamo() {
       void queryClient.invalidateQueries({ queryKey: claves.reclamos });
       void queryClient.invalidateQueries({ queryKey: claves.pedido(reclamo.pedido_codigo) });
     },
+  });
+}
+
+/** Pregunta al asistente; se envía la conversación completa (el backend no guarda chats). */
+export function useConsultarAsistente() {
+  return useMutation({
+    mutationFn: (mensajes: MensajeChat[]) =>
+      api<RespuestaAsistente>('/asistente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mensajes }),
+      }),
   });
 }

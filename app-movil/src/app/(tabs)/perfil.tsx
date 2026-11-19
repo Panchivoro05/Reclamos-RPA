@@ -10,6 +10,7 @@ import type { NombreIcono } from '@/lib/catalogos';
 import { cerrarSesionFirebase } from '@/lib/firebase';
 import { darDeBajaPush } from '@/lib/push';
 import { queryClient } from '@/lib/queryClient';
+import { useChat } from '@/store/chat';
 import { useSesion } from '@/store/sesion';
 
 async function cerrarSesion() {
@@ -18,6 +19,7 @@ async function cerrarSesion() {
   if (config.modoAuth === 'firebase') await cerrarSesionFirebase().catch(() => undefined);
   useSesion.getState().cerrar();
   queryClient.clear();
+  useChat.getState().limpiar();
 }
 
 function Dato({ icono, etiqueta, valor }: { icono: NombreIcono; etiqueta: string; valor: string }) {

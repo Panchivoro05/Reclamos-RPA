@@ -41,6 +41,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="ayuda"
+        options={{ title: 'Asistente', tabBarIcon: icono('sparkles-outline') }}
+      />
+      <Tabs.Screen
         name="perfil"
         options={{ title: 'Perfil', tabBarIcon: icono('person-outline') }}
       />
