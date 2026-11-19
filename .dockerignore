@@ -1,0 +1,13 @@
+# Solo el código: nada de entornos, dependencias, datos locales ni secretos.
+**/.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.git
+.env
+.env.*
+app-movil
+backend/uploads
+bot-rpa/salidas
+sistema-caja/data

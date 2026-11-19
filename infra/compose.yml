@@ -39,6 +39,37 @@ services:
       timeout: 3s
       retries: 10
 
+  # Worker de Celery + bot RPA (oculto). No arranca por defecto:
+  #   docker compose -f infra/compose.yml --profile worker up -d --build
+  # Para la demo con el navegador visible, ejecuta el worker directo en Fedora (ver README).
+  worker:
+    profiles: [worker]
+    build:
+      context: ..
+      dockerfile: infra/worker.Dockerfile
+      args:
+        # Tu usuario de Fedora (id -u / id -g): así la evidencia queda a tu nombre.
+        UID: ${WORKER_UID:-1000}
+        GID: ${WORKER_GID:-1000}
+    image: reclamos-rpa-worker
+    restart: unless-stopped
+    # Red del host: llega a PostgreSQL, Valkey y SISCAJA en 127.0.0.1 sin exponer nada nuevo.
+    network_mode: host
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      UPLOAD_DIR: /app/uploads
+      BOT_VISIBLE: "false"
+    volumes:
+      # La evidencia del bot queda donde la API la sirve (backend/uploads). :Z por SELinux.
+      - ../backend/uploads:/app/uploads:Z
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
 volumes:
   pg_data:
   valkey_data:
