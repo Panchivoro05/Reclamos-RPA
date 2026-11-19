@@ -39,6 +39,9 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
+      - name: Validar el compose (incluido el worker)
+        working-directory: .
+        run: docker compose -f infra/compose.yml --profile worker config --quiet
 
   app-movil:
     runs-on: ubuntu-latest

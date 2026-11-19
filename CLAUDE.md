@@ -86,6 +86,11 @@ rfbrowser init chromium
 python -m bot_rpa --pedido BY-000101 --solucion cupon --monto 5 --motivo "..." --visible
 ruff check . && robocop check robot && pytest
 
+# Worker Celery (desde backend/, necesita API, SISCAJA y bot listos)
+celery -A app.worker worker -B --loglevel info        # BOT_VISIBLE=true para ver el navegador
+docker compose -f infra/compose.yml --profile worker up -d --build   # o en Docker (oculto)
+python -m app.seed --reiniciar-reclamos               # demo limpia (borra reclamos)
+
 # App móvil
 cd app-movil && npm install && npm start   # Expo en el puerto 8082
 npm run lint && npm run typecheck && npm test

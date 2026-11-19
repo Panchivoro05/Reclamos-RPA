@@ -7,9 +7,11 @@ El cliente registra desde la app móvil un reclamo sobre su pedido (producto equ
 incompleto, producto en mal estado o demora), con descripción y foto. La API lo valida, lo guarda
 en PostgreSQL y lo deja listo para el procesamiento automático.
 
-La compensación se registra en **SISCAJA**, el sistema de caja antiguo de BurgerYa, que no tiene
-API: un **bot RPA** lo opera por su interfaz web, como lo haría un cajero (el worker que conecta
-ambos lados llega en la fase 3).
+Un **worker de Celery** toma cada reclamo de la cola (Valkey), aplica las reglas de negocio y los
+controles antifraude, y lanza un **bot RPA** que registra la compensación en **SISCAJA**, el
+sistema de caja antiguo de BurgerYa, que no tiene API: el bot lo opera por su interfaz web, como lo
+haría un cajero. El cliente ve cada paso en la app y, al final, el video del bot resolviendo su
+reclamo. Los casos dudosos se escalan a un agente humano.
 
 ## Estado
 
@@ -17,7 +19,7 @@ ambos lados llega en la fase 3).
 |---|---|---|
 | 1 | Base del proyecto, pedidos y reclamos (API + app) | ✅ |
 | 2 | Sistema de caja antiguo + bot RPA | ✅ |
-| 3 | Automatización de punta a punta (Celery) | Pendiente |
+| 3 | Automatización de punta a punta (Celery) | ✅ |
 | 4 | Tiempo real y notificaciones | Pendiente |
 | 5 | IA con Gemini | Pendiente |
 | 6 | Panel web de supervisión | Pendiente |
@@ -27,10 +29,10 @@ ambos lados llega en la fase 3).
 
 ```
 app-movil/     App del cliente (React Native + Expo SDK 58, Expo Router)
-backend/       API FastAPI + SQLAlchemy + Alembic + pruebas (pytest)
+backend/       API FastAPI + worker Celery + SQLAlchemy + Alembic + pruebas (pytest)
 sistema-caja/  Sistema de caja antiguo SISCAJA (Flask + Jinja2 + SQLite, sin API)
 bot-rpa/       Bot RPA que opera SISCAJA (Robot Framework + Browser Library)
-infra/         Docker Compose (PostgreSQL 16, Valkey 8)
+infra/         Docker Compose (PostgreSQL 16, Valkey 8 y el worker)
 .github/       CI: backend, sistema de caja, bot (con navegador real) y app
 ```
 
@@ -162,7 +164,34 @@ python -m bot_rpa --pedido BY-000101 --solucion reembolso_parcial --monto 10 \
 - Playwright funcionó directamente en Fedora 44; si `rfbrowser init` fallara en otra versión,
   se puede ejecutar el bot en un contenedor `mcr.microsoft.com/playwright`.
 
-### 7. firewalld (si el celular no llega a la PC)
+### 7. Worker (Celery): la automatización de punta a punta
+
+Con la API, SISCAJA y el bot listos, el worker procesa cada reclamo nuevo solo. Elige **una**
+forma de ejecutarlo (dos workers a la vez se reparten los reclamos):
+
+```bash
+# a) En Fedora, con el navegador del bot VISIBLE (para la demo)
+cd backend && source .venv/bin/activate
+BOT_VISIBLE=true celery -A app.worker worker -B --loglevel info
+
+# b) En Fedora, oculto (como en producción)
+celery -A app.worker worker -B --loglevel info
+
+# c) En Docker (siempre oculto). Desde la raíz:
+docker compose -f infra/compose.yml --profile worker up -d --build
+docker compose -f infra/compose.yml logs -f worker
+```
+
+- `-B` activa Celery Beat: cada minuto rescata los reclamos que quedaron en "recibido" porque
+  Valkey no respondía al crearlos.
+- `BOT_MODO=simulado` resuelve sin SISCAJA ni navegador (útil para probar la app sola).
+- La imagen de Docker usa `mcr.microsoft.com/playwright` (unos 4 GB) y corre con tu uid/gid
+  (`WORKER_UID`, `WORKER_GID`) para que la evidencia en `backend/uploads` quede a tu nombre.
+- Para una demo limpia: `python -m app.seed --reiniciar-reclamos` (borra todos los reclamos y su
+  evidencia; deja pedidos, clientes y reglas). En SISCAJA:
+  `rm data/caja.db && flask --app caja init-db && flask --app caja sincronizar`.
+
+### 8. firewalld (si el celular no llega a la PC)
 
 La zona por defecto de **Fedora Workstation** ya permite los puertos 1025 a 65535. En otras zonas
 (por ejemplo, Fedora Server), abre la API y Expo:
@@ -213,7 +242,8 @@ Se elige con `AUTH_MODE` (backend) y `EXPO_PUBLIC_AUTH_MODE` (app):
 | GET | `/pedidos/{codigo}` | Detalle con ítems y tipos de reclamo disponibles |
 | POST | `/reclamos` | Registra un reclamo (multipart: `pedido_codigo`, `tipo`, `descripcion`, `items`, `foto`) |
 | GET | `/reclamos` | Reclamos del cliente |
-| GET | `/reclamos/{codigo}` | Detalle con ítems y línea de tiempo |
+| GET | `/reclamos/{codigo}` | Detalle con ítems, línea de tiempo y `resolucion` (compensación, número de operación y video) |
+| GET | `/reclamos/{codigo}/video` | Video del bot registrando la compensación (solo para su dueño) |
 | GET | `/archivos/{nombre}` | Foto de un reclamo (solo para su dueño) |
 
 Los errores tienen la forma `{"detail": "<mensaje para el cliente>", "codigo": "<código estable>"}`:
@@ -230,6 +260,59 @@ Los errores tienen la forma `{"detail": "<mensaje para el cliente>", "codigo": "
   parcial en PostgreSQL, aunque lleguen dos peticiones a la vez).
 - "Producto equivocado" y "mal estado" requieren foto (JPG, PNG o WEBP, máximo 5 MB; el formato se
   verifica por el contenido del archivo, no por su extensión).
+
+## Procesamiento automático (fase 3)
+
+```
+recibido → en_validacion → validado → en_resolucion → resuelto
+                 └──────────→ escalado ←──────────┘
+```
+
+| Estado | Lo hace | Mensaje que ve el cliente |
+|---|---|---|
+| `en_validacion` | worker | "Estamos revisando tu reclamo." |
+| `validado` | reglas | "¡Tu reclamo fue aprobado! Te corresponde un reembolso de S/ 8.90." |
+| `en_resolucion` | bot | "Estamos registrando tu compensación en nuestro sistema de caja." |
+| `resuelto` | bot | "¡Listo! Registramos un reembolso de S/ 8.90. Número de operación: CMP-000001." |
+| `escalado` | reglas o bot | "Tu caso necesita una revisión adicional. Un agente de BurgerYa lo atenderá pronto." |
+
+El motivo real del escalamiento (por ejemplo, "Supera el monto máximo automático: S/ 55.80 >
+S/ 40.00") se guarda en `reclamos.motivo_escalamiento` para el agente; el cliente nunca lo ve.
+
+### Reglas y controles antifraude (configurables)
+
+Viven en la base de datos, no en el código. En la fase 6 se editarán desde el panel web; mientras
+tanto, con SQL:
+
+| Tipo | Solución | Monto | Foto |
+|---|---|---|---|
+| `producto_equivocado` | `reenvio` | S/ 0 (se reenvía el producto) | Obligatoria |
+| `pedido_incompleto` | `reembolso_parcial` | Valor de los productos afectados | No |
+| `mal_estado` | `reembolso_parcial` | Valor de los productos afectados | Obligatoria |
+| `demora` | `cupon` | S/ 10 fijo | No |
+
+Controles (tabla `politica_antifraude`): monto máximo de compensación automática **S/ 40** y
+máximo **3 reclamos por cliente en 30 días**. Un reclamo que no pasa algún control se escala.
+
+```sql
+-- Ejemplos (psql: docker exec -it reclamos-rpa-postgres-1 psql -U reclamos)
+UPDATE politica_antifraude SET monto_maximo_automatico = 60;
+UPDATE reglas_resolucion SET base_monto = 'porcentaje_total', valor = 15 WHERE tipo = 'demora';
+UPDATE reglas_resolucion SET requiere_foto = true WHERE tipo = 'pedido_incompleto';
+```
+
+`requiere_foto` también lo usan la API y la app al registrar el reclamo: la regla vive en un
+solo lugar.
+
+### Reintentos y evidencia
+
+- Errores técnicos del bot (caja caída, tiempo agotado): 2 reintentos (30 s y 60 s); si siguen
+  fallando, se escala. Errores de negocio (datos que no coinciden, monto rechazado): se escala
+  de inmediato.
+- Cada intento queda en `ejecuciones_bot`, con su evidencia copiada en
+  `backend/uploads/evidencias/<reclamo>/intento-<n>/` (capturas, `video.webm`, `resultado.json`).
+- El motivo en SISCAJA empieza con el código del reclamo. Si un reintento encuentra esa
+  operación en el historial del pedido, la reutiliza: **nunca se compensa dos veces**.
 
 ## SISCAJA y bot RPA
 
@@ -326,3 +409,18 @@ GitHub Actions ejecuta lo mismo en cada push a `main` y en cada pull request.
 - **El robot corre en un proceso aparte** con tiempo límite: si el navegador se cuelga, no
   arrastra al worker. La clave viaja por variable de entorno y se escribe con `Type Secret`
   (no queda en ningún log; una prueba lo verifica).
+- **Worker con Celery y Valkey:** la API solo guarda y encola (responde rápido aunque el bot tarde
+  40 s). Valkey habla el protocolo de Redis, por eso Celery usa su transporte `redis://`.
+- **Un reclamo a la vez** (concurrencia 1): SISCAJA es "una terminal de caja".
+- **`acks_late`:** el mensaje se confirma al terminar; si el worker muere a mitad, Celery lo
+  vuelve a entregar. Y el procesamiento retoma desde el estado guardado, sin repetir pasos.
+- **Bloqueo de fila (`SELECT ... FOR UPDATE`)** en cada cambio de estado, pero no mientras el bot
+  trabaja: dos procesos nunca avanzan el mismo reclamo a la vez.
+- **Si Valkey está caído,** el cliente igual registra su reclamo; Celery Beat lo rescata.
+- **Reglas en tablas y funciones puras:** cada control se prueba por separado y el agente ve todos
+  los motivos del escalamiento, no solo el primero. La IA (fase 5) nunca decidirá montos.
+- **El bot corre como programa aparte** (su propio entorno Python): el backend no carga Robot ni
+  Playwright; se comunican por línea de comandos y JSON. En las pruebas, un bot simulado.
+- **Video para el cliente:** la evidencia del bot (con el cursor visible) se sirve solo a su
+  dueño. En Android se reproduce el WebM directamente; en iOS no (pendiente convertir a MP4 en la
+  fase 7).
