@@ -91,6 +91,7 @@ celery -A app.worker worker -B --loglevel info        # BOT_VISIBLE=true para ve
 docker compose -f infra/compose.yml --profile worker up -d --build   # o en Docker (oculto)
 python -m app.seed --reiniciar-reclamos               # demo limpia (borra reclamos)
 celery -A app.worker worker -Q notificaciones -c 4 -n notificaciones@%h --loglevel info  # avisos push
+IA_MODO=gemini python -m app.ia_prueba "Llegó fría" --tipo mal_estado [--foto f.jpg]    # probar la IA
 # Los workers leen el código y el .env solo al arrancar: reiniciarlos tras cambios.
 
 # App móvil

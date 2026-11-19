@@ -198,7 +198,8 @@ cambiar a OpenAI:
 2) Análisis de la foto: ¿es coherente con lo reclamado?
 3) Redacción de los mensajes al cliente (cordiales, breves, en español de Perú).
 4) Llamada a funciones controladas (consultar_pedido, consultar_estado_reclamo) para un
-   asistente de consultas por WhatsApp.
+   asistente de consultas en la app (pestaña "Asistente"; reemplaza a WhatsApp: decidido en
+   la fase 5).
 Si la confianza es baja o la foto no coincide → escalado. La IA nunca decide montos.
 Registra cada llamada (latencia y costo aproximado). Pruebas con el proveedor simulado.
 Primero el plan.
