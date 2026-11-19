@@ -180,9 +180,9 @@ Vamos a trabajar la FASE 4. Lee el CLAUDE.md.
 2) Notificaciones push con expo-notifications y Expo Push Service: registro del token del
    dispositivo y envío en cada cambio de estado. Recuerda que en Android se necesita una
    development build (no Expo Go).
-3) WhatsApp Cloud API: envío de plantillas en los hitos (recibido, resuelto, escalado) y
-   webhook para recibir respuestas, expuesto con Cloudflare Tunnel o ngrok.
-   Interfaz NotificadorWhatsApp con implementación falsa para pruebas.
+3) Aviso por correo (SMTP) en los hitos (recibido, resuelto, escalado), con plantilla HTML.
+   Mailpit en Docker Compose para verlos en desarrollo. Interfaz NotificadorCorreo con
+   implementación falsa para pruebas. (Reemplaza a WhatsApp Cloud API: decidido en la fase 4.)
 Primero el plan.
 ```
 

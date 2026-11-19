@@ -10,7 +10,7 @@ Caso de estudio ficticio: **BurgerYa**, cadena de comida rápida con delivery en
 3. La API (FastAPI) guarda el reclamo en PostgreSQL y lo encola en Valkey.
 4. Un worker de Celery toma el reclamo, pide a Gemini que lo clasifique y analice la foto, y lanza el bot RPA.
 5. El bot (Robot Framework + Browser Library) opera por interfaz el **sistema de caja antiguo** (Flask, sin API): busca el pedido, lo valida y registra la compensación.
-6. Cada cambio de estado se notifica por push (Expo) y WhatsApp, y la app lo muestra en vivo por WebSocket.
+6. Cada cambio de estado se notifica por push (Expo) y, en los hitos, por correo; la app lo muestra en vivo por WebSocket.
 7. Los casos que no pasan las reglas o los controles antifraude se escalan a un agente humano en el panel web.
 
 **Por qué RPA:** el sistema de caja no tiene API. El bot debe operarlo por su interfaz web, como lo haría una persona. **Nunca** crear un endpoint en `sistema-caja/` para que el bot lo consuma: eso anularía la justificación del proyecto.
@@ -37,7 +37,7 @@ Tipos de reclamo: `producto_equivocado`, `pedido_incompleto`, `mal_estado`, `dem
 | Sistema de caja antiguo | Flask + Jinja2 + SQLite, **sin API** |
 | IA | API de Gemini con el SDK `google-genai` |
 | Auth y archivos | Firebase Authentication (+ Firebase Storage más adelante) |
-| Notificaciones | Expo Push Service + FCM; WhatsApp Cloud API (Meta) |
+| Notificaciones | Expo Push Service + FCM; correo por SMTP (Mailpit en desarrollo) |
 | Contenedores | **Docker Engine + Docker Compose** (plugin `docker compose`, no el antiguo `docker-compose`). Producción con Compose + `restart: unless-stopped` |
 | CI/CD | GitHub Actions; EAS Build para la app |
 | Calidad | ruff (lint + formato), pytest, ESLint, Prettier, Jest |
@@ -90,10 +90,13 @@ ruff check . && robocop check robot && pytest
 celery -A app.worker worker -B --loglevel info        # BOT_VISIBLE=true para ver el navegador
 docker compose -f infra/compose.yml --profile worker up -d --build   # o en Docker (oculto)
 python -m app.seed --reiniciar-reclamos               # demo limpia (borra reclamos)
+celery -A app.worker worker -Q notificaciones -c 4 -n notificaciones@%h --loglevel info  # avisos push
+# Los workers leen el código y el .env solo al arrancar: reiniciarlos tras cambios.
 
 # App móvil
 cd app-movil && npm install && npm start   # Expo en el puerto 8082
 npm run lint && npm run typecheck && npm test
+npx eas-cli@latest build --profile development --platform android   # build con push (Expo Go no recibe push)
 ```
 
 ## Particularidades de Fedora (importante)

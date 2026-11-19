@@ -10,8 +10,9 @@ en PostgreSQL y lo deja listo para el procesamiento automático.
 Un **worker de Celery** toma cada reclamo de la cola (Valkey), aplica las reglas de negocio y los
 controles antifraude, y lanza un **bot RPA** que registra la compensación en **SISCAJA**, el
 sistema de caja antiguo de BurgerYa, que no tiene API: el bot lo opera por su interfaz web, como lo
-haría un cajero. El cliente ve cada paso en la app y, al final, el video del bot resolviendo su
-reclamo. Los casos dudosos se escalan a un agente humano.
+haría un cajero. El cliente ve cada paso **en vivo** en la app (WebSocket), recibe un **aviso push**
+por cada cambio de estado y, al final, ve el video del bot resolviendo su reclamo. Los casos dudosos
+se escalan a un agente humano.
 
 ## Estado
 
@@ -20,7 +21,7 @@ reclamo. Los casos dudosos se escalan a un agente humano.
 | 1 | Base del proyecto, pedidos y reclamos (API + app) | ✅ |
 | 2 | Sistema de caja antiguo + bot RPA | ✅ |
 | 3 | Automatización de punta a punta (Celery) | ✅ |
-| 4 | Tiempo real y notificaciones | Pendiente |
+| 4 | Tiempo real y notificaciones push (falta el aviso por correo) | En curso |
 | 5 | IA con Gemini | Pendiente |
 | 6 | Panel web de supervisión | Pendiente |
 | 7 | DevOps completo | Pendiente |
@@ -32,7 +33,7 @@ app-movil/     App del cliente (React Native + Expo SDK 58, Expo Router)
 backend/       API FastAPI + worker Celery + SQLAlchemy + Alembic + pruebas (pytest)
 sistema-caja/  Sistema de caja antiguo SISCAJA (Flask + Jinja2 + SQLite, sin API)
 bot-rpa/       Bot RPA que opera SISCAJA (Robot Framework + Browser Library)
-infra/         Docker Compose (PostgreSQL 16, Valkey 8 y el worker)
+infra/         Docker Compose (PostgreSQL 16, Valkey 8, worker y worker de notificaciones)
 .github/       CI: backend, sistema de caja, bot (con navegador real) y app
 ```
 
@@ -107,7 +108,10 @@ npm install
 npm start          # Expo en el puerto 8082
 ```
 
-Escanea el código QR con Expo Go (Android) o con la cámara (iOS).
+Escanea el código QR con Expo Go (Android) o con la cámara (iOS). En Expo Go todo funciona menos
+las notificaciones push; para recibirlas hace falta la development build (ver
+[Development build](#development-build-con-eas-push-en-android)). Si la tienes instalada, `npm start`
+abre esa build; presiona `s` para cambiar a Expo Go.
 
 Si cambias `app-movil/.env`, reinicia limpiando la caché con `npm start -- -c`.
 
@@ -179,8 +183,21 @@ celery -A app.worker worker -B --loglevel info
 
 # c) En Docker (siempre oculto). Desde la raíz:
 docker compose -f infra/compose.yml --profile worker up -d --build
-docker compose -f infra/compose.yml logs -f worker
+docker compose -f infra/compose.yml logs -f worker worker-notificaciones
 ```
+
+Además, en otra terminal, el **worker de notificaciones** (solo envía avisos push; en Docker ya
+arranca con la opción c):
+
+```bash
+cd backend && source .venv/bin/activate
+celery -A app.worker worker -Q notificaciones -c 4 -n notificaciones@%h --loglevel info
+```
+
+- **Los workers leen el código y el `.env` solo al arrancar** (la API con `--reload`, en cambio, se
+  recarga sola). Tras un `git pull` o un cambio en el `.env` (`PUSH_MODO`, `BOT_VISIBLE`…),
+  reinícialos con Ctrl+C; en Docker, `up -d --build`. Si el log del worker de notificaciones
+  muestra `[push falso]`, sigue con `PUSH_MODO=falso`.
 
 - `-B` activa Celery Beat: cada minuto rescata los reclamos que quedaron en "recibido" porque
   Valkey no respondía al crearlos.
@@ -246,6 +263,9 @@ Se elige con `AUTH_MODE` (backend) y `EXPO_PUBLIC_AUTH_MODE` (app):
 | GET | `/reclamos/{codigo}` | Detalle con ítems, línea de tiempo y `resolucion` (compensación, número de operación y video) |
 | GET | `/reclamos/{codigo}/video` | Video del bot registrando la compensación (solo para su dueño) |
 | GET | `/archivos/{nombre}` | Foto de un reclamo (solo para su dueño) |
+| POST | `/dispositivos` | Registra el token push del celular (`{token, plataforma}`); 204 |
+| DELETE | `/dispositivos/{token}` | Da de baja el celular al cerrar sesión; 204 |
+| WS | `/ws` | Cambios de estado en vivo (ver [Tiempo real](#tiempo-real-y-notificaciones-fase-4)) |
 
 Los errores tienen la forma `{"detail": "<mensaje para el cliente>", "codigo": "<código estable>"}`:
 400 (datos mal formados), 401 (sin sesión), 404 (no existe o no es tuyo), 409 (reclamo duplicado),
@@ -353,6 +373,59 @@ cancelados no admiten compensaciones. Cada registro genera un número de operaci
 | `compensacion_rechazada` | SISCAJA rechazó la compensación (por ejemplo, monto excedido) |
 | `tiempo_agotado` / `error_inesperado` | El bot no terminó o falló algo ajeno al negocio |
 
+## Tiempo real y notificaciones (fase 4)
+
+```
+API o worker ──commit──▶ PostgreSQL
+      │
+      ├─ publish ──▶ Valkey "reclamos:cliente:{id}" ──▶ API /ws ──▶ app: vuelve a pedir el detalle
+      │
+      └─ encola ───▶ cola "notificaciones" ──▶ worker de notificaciones ──▶ Expo Push ──▶ FCM ──▶ celular
+```
+
+**En vivo (WebSocket).** Quien cambia el estado (la API al crear el reclamo, el worker al
+procesarlo) publica, **después del commit**, un aviso pequeño en el canal del cliente:
+`{"tipo": "reclamo_actualizado", "codigo", "estado", "evento_id", "momento"}`. La API escucha ese
+canal y lo reenvía por WebSocket; la app invalida sus consultas y vuelve a pedir el detalle por
+REST.
+
+- La sesión viaja en el **primer mensaje**, no en la URL (que queda en los logs):
+  `{"tipo": "autenticar", "encabezados": {"Authorization": "Bearer …"}}` (o `X-Dev-User`). Sin él
+  en 10 s, o si no es válido, se cierra con el código 4401. La API responde `{"tipo": "conectado"}`.
+- Ping/pong cada 25 s; si se corta, la app reconecta con espera creciente (1 s hasta 30 s) y,
+  mientras tanto, consulta cada 3 s. En el detalle se ve "● En vivo" o "Actualizando…".
+- En segundo plano la app cierra el WebSocket (para eso está el push) y lo reabre al volver.
+
+**Push.** Por cada cambio de estado se encola la tarea `notificaciones.enviar(evento_id)`, que
+envía un aviso a cada celular activo del cliente por **Expo Push Service**. Al tocarlo se abre el
+detalle del reclamo, aunque la app estuviera cerrada.
+
+- `PUSH_MODO=falso` (por defecto) solo escribe el aviso en el log; `PUSH_MODO=expo` lo envía.
+- La tabla `notificaciones` guarda cada envío (evento, canal, estado, destinatarios, detalle).
+- Si Expo responde `DeviceNotRegistered` (la app se desinstaló), el celular se desactiva.
+- Si Expo no responde, la tarea reintenta a los 10, 20 y 40 s.
+
+### Development build con EAS (push en Android)
+
+Desde el SDK 53, **Expo Go no recibe push en Android**. Hace falta una development build: la
+misma app, compilada con tu configuración, que carga el JavaScript desde Metro igual que Expo Go.
+
+1. Cuenta en expo.dev; en `app-movil/`: `npx eas-cli@latest login` y
+   `npx eas-cli@latest init` (escribe el `projectId` y el `owner` en `app.json`).
+2. **Firebase** (console.firebase.google.com): proyecto nuevo → agregar app Android con el paquete
+   `pe.burgerya.reclamos` → descargar `google-services.json` en `app-movil/`. Ese archivo solo
+   tiene identificadores públicos y **va en el repositorio** (EAS solo sube lo que está en git).
+3. Firebase → Configuración del proyecto → **Cuentas de servicio** → Generar nueva clave privada.
+   Esa clave es **secreta**: guárdala fuera del repositorio (por ejemplo `~/claves/`) y súbela a
+   EAS con `npx eas-cli@latest credentials` → Android → Google Service Account → FCM V1 → Upload.
+4. `npx eas-cli@latest build --profile development --platform android` (10 a 20 min en la cola
+   gratuita). Instala el APK con el enlace o el QR (en el emulador, arrastrándolo).
+5. `npm start`, abre "BurgerYa Reclamos" y elige el servidor de Metro.
+6. En el `.env` de la raíz, `PUSH_MODO=expo`, y reinicia el worker de notificaciones.
+
+Solo se recompila si cambian dependencias nativas o `app.json`; los cambios de JavaScript llegan
+por Metro (en la app, `r` en la terminal de Metro).
+
 ## Calidad
 
 ```bash
@@ -425,3 +498,26 @@ GitHub Actions ejecuta lo mismo en cada push a `main` y en cada pull request.
 - **Video para el cliente:** la evidencia del bot (con el cursor visible) se sirve solo a su
   dueño. En Android se reproduce el WebM directamente; en iOS no (pendiente convertir a MP4 en la
   fase 7).
+- **Un reclamo no compensa dos veces la misma unidad:** al reclamar se descuentan las unidades ya
+  reclamadas en el pedido (la app muestra cuántas quedan), y antes de reembolsar se controla el
+  saldo del pedido igual que SISCAJA. Así un caso que SISCAJA rechazaría no llega al bot.
+- **Los códigos de reclamo no se reinician** ni en una demo limpia: SISCAJA guarda cada
+  compensación con ese código y el bot la busca por él para no pagar dos veces. Un código repetido
+  haría que el bot "encontrara" la compensación de otro reclamo.
+- **Aviso en vivo después del commit:** nadie avisa de algo que todavía no está guardado. Si
+  Valkey falla, el aviso se pierde sin romper nada: el cambio ya está en PostgreSQL.
+- **El aviso solo dice "cambió":** la app vuelve a pedir el detalle por REST, que sigue siendo la
+  fuente de verdad (con sus permisos). Un aviso perdido o repetido no deja datos inconsistentes.
+- **Pub/sub en vez de consultar la base:** la API no pregunta cada segundo por cada cliente
+  conectado; Valkey (que ya usamos como cola) reparte el aviso al instante. Un canal por cliente.
+- **WebSocket y push se complementan:** con la app abierta, WebSocket (instantáneo, sin pasar por
+  Google); cerrada o en segundo plano, push. Si el WebSocket se cae, la app consulta cada 3 s.
+- **Cola aparte para los avisos** (`notificaciones`, concurrencia 4): el worker del bot procesa un
+  reclamo a la vez; si los avisos fueran en la misma cola, esperarían a que el bot termine.
+- **Una sola vez por evento y canal:** antes de enviar se reserva una fila (único `evento_id` +
+  `canal`); un reintento o un mensaje repetido de la cola la encuentra y no reenvía. Si el envío
+  falla por algo técnico, la reserva se libera para reintentar.
+- **Expo Push en vez de FCM directo:** el backend solo habla HTTPS con Expo; la clave de Firebase
+  vive en EAS, no en el servidor. El mismo código sirve para iOS (APNs) más adelante.
+- **expo-notifications se carga solo donde hay push:** en Expo Go y en Jest no se importa, así la
+  app sigue funcionando (sin push) y las pruebas no dependen de módulos nativos.
