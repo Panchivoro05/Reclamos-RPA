@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -239,12 +239,14 @@ def seed(session: Session, ahora: datetime | None = None) -> None:
 def reiniciar_reclamos(session: Session, carpeta_archivos: Path) -> int:
     """Borra TODOS los reclamos (con eventos, ítems y ejecuciones del bot) y su evidencia.
 
-    Solo para desarrollo y demos: deja el correlativo otra vez en RC-AAAA-000001.
-    No toca pedidos, clientes, productos ni reglas.
+    Solo para desarrollo y demos. No toca pedidos, clientes, productos ni reglas.
+
+    El correlativo NO vuelve a empezar: SISCAJA guarda cada compensación con el código del
+    reclamo y el bot la busca por ese código para no compensar dos veces. Si un reclamo nuevo
+    repitiera un código viejo, el bot "encontraría" la compensación de otro y la reutilizaría.
     """
     fotos = [r for r in session.scalars(select(Reclamo.foto_ruta)) if r]
     cantidad = session.execute(delete(Reclamo)).rowcount
-    session.execute(text("ALTER SEQUENCE reclamo_codigo_seq RESTART"))
     session.commit()
     for foto in fotos:
         if PATRON_NOMBRE.match(foto):

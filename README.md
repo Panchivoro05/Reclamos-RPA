@@ -188,7 +188,8 @@ docker compose -f infra/compose.yml logs -f worker
 - La imagen de Docker usa `mcr.microsoft.com/playwright` (unos 4 GB) y corre con tu uid/gid
   (`WORKER_UID`, `WORKER_GID`) para que la evidencia en `backend/uploads` quede a tu nombre.
 - Para una demo limpia: `python -m app.seed --reiniciar-reclamos` (borra todos los reclamos y su
-  evidencia; deja pedidos, clientes y reglas). En SISCAJA:
+  evidencia; deja pedidos, clientes y reglas). Los códigos no se reinician: SISCAJA guarda cada
+  compensación con el código del reclamo y el bot la reutilizaría si se repitiera. En SISCAJA:
   `rm data/caja.db && flask --app caja init-db && flask --app caja sincronizar`.
 
 ### 8. firewalld (si el celular no llega a la PC)

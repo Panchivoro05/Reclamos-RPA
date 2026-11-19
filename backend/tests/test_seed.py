@@ -52,7 +52,7 @@ def test_reiniciar_reclamos_borra_reclamos_y_evidencia(
     assert reiniciar_reclamos(db, tmp_path) == 1
     assert db.scalar(select(func.count(Reclamo.id))) == 0
     assert not (tmp_path / "evidencias").exists()
-    # Los pedidos siguen y el correlativo vuelve a empezar.
+    # Los pedidos siguen y el correlativo no se repite (SISCAJA guarda los códigos viejos).
     assert db.scalar(select(func.count(Pedido.id))) == 8
     nuevo = crear_reclamo(client)
-    assert nuevo.json()["codigo"].endswith("-000001")
+    assert nuevo.json()["codigo"].endswith("-000002")
