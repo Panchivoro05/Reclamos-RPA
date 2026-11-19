@@ -25,6 +25,16 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Para la prueba del suscriptor de eventos contra Valkey de verdad.
+      valkey:
+        image: valkey/valkey:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql+psycopg://reclamos:reclamos_dev@localhost:5432/reclamos
       AUTH_MODE: dev

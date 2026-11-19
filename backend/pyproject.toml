@@ -47,4 +47,6 @@ ignore = ["N818"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Si una prueba se cuelga (por ejemplo, esperando un mensaje del WebSocket), muestra dónde.
+faulthandler_timeout = 60
 addopts = "-q"

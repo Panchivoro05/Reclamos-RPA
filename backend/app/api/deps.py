@@ -18,16 +18,15 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 Almacenamiento = Annotated[AlmacenamientoArchivos, Depends(get_almacenamiento)]
 
 
-def get_cliente_actual(
-    db: DbSession,
-    settings: SettingsDep,
-    x_dev_user: Annotated[str | None, Header(alias="X-Dev-User")] = None,
-    authorization: Annotated[str | None, Header()] = None,
+def autenticar(
+    db: Session, settings: Settings, x_dev_user: str | None, authorization: str | None
 ) -> Cliente:
     """Cliente que hace la petición, según AUTH_MODE.
 
     - dev: el encabezado X-Dev-User trae el correo del cliente (solo desarrollo y pruebas).
     - firebase: Authorization: Bearer <ID token de Firebase>.
+
+    La usan las rutas HTTP (con encabezados) y el WebSocket (con su primer mensaje).
     """
     if settings.auth_mode is AuthMode.DEV:
         if not x_dev_user:
@@ -43,6 +42,15 @@ def get_cliente_actual(
     if esquema.lower() != "bearer" or not token:
         raise NoAutenticado("sin_sesion", "Inicia sesión para continuar.")
     return clientes.obtener_o_crear_desde_firebase(db, verificar_token_firebase(token))
+
+
+def get_cliente_actual(
+    db: DbSession,
+    settings: SettingsDep,
+    x_dev_user: Annotated[str | None, Header(alias="X-Dev-User")] = None,
+    authorization: Annotated[str | None, Header()] = None,
+) -> Cliente:
+    return autenticar(db, settings, x_dev_user, authorization)
 
 
 ClienteActual = Annotated[Cliente, Depends(get_cliente_actual)]
