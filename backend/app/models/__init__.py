@@ -8,10 +8,12 @@ from app.models.enums import (
     EstadoNotificacion,
     EstadoPedido,
     EstadoReclamo,
+    OperacionIA,
     PlataformaDispositivo,
     SolucionCompensacion,
     TipoReclamo,
 )
+from app.models.ia import LlamadaIA
 from app.models.notificacion import Dispositivo, Notificacion
 from app.models.pedido import Pedido, PedidoItem
 from app.models.producto import Producto
@@ -36,7 +38,9 @@ __all__ = [
     "EstadoNotificacion",
     "EstadoPedido",
     "EstadoReclamo",
+    "LlamadaIA",
     "Notificacion",
+    "OperacionIA",
     "Pedido",
     "PedidoItem",
     "PlataformaDispositivo",

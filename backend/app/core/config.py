@@ -22,6 +22,10 @@ class PushModo(StrEnum):
     FALSO = "falso"  # solo se registra en el log (pruebas y desarrollo sin celular)
 
 
+class IAModo(StrEnum):
+    SIMULADO = "simulado"  # reglas de palabras clave: pruebas y demos sin internet
+
+
 class Settings(BaseSettings):
     """Configuración leída de variables de entorno (y del .env de la raíz si existe)."""
 
@@ -60,6 +64,12 @@ class Settings(BaseSettings):
     expo_push_url: str = "https://exp.host/--/api/v2/push/send"
     # Opcional: solo si en expo.dev se activa "Enhanced Security for Push Notifications".
     expo_access_token: str = ""
+
+    # ---------- Inteligencia artificial (fase 5) ----------
+    ia_modo: IAModo = IAModo.SIMULADO
+    # Precio del modelo en USD por millón de tokens: solo para estimar el costo de cada llamada.
+    ia_precio_entrada_usd_millon: float = 0.0
+    ia_precio_salida_usd_millon: float = 0.0
 
     @property
     def bot_python(self) -> Path:

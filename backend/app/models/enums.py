@@ -81,3 +81,10 @@ class EstadoNotificacion(StrEnum):
     ENVIADA = "enviada"
     FALLIDA = "fallida"
     OMITIDA = "omitida"  # no había a quién enviarla (sin dispositivos, sin correo...)
+
+
+class OperacionIA(StrEnum):
+    CLASIFICAR_TEXTO = "clasificar_texto"
+    ANALIZAR_FOTO = "analizar_foto"
+    REDACTAR_MENSAJE = "redactar_mensaje"
+    ASISTENTE = "asistente"
