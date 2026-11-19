@@ -45,3 +45,13 @@ class ReglaNegocio(ErrorAPI):
     """La petición es válida en forma, pero no cumple una regla del negocio."""
 
     status_code = 422
+
+
+class ServicioNoDisponible(ErrorAPI):
+    """Un servicio externo (por ejemplo, la IA) no respondió: se puede reintentar más tarde."""
+
+    status_code = 503
+
+
+class DemasiadasPeticiones(ErrorAPI):
+    status_code = 429

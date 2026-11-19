@@ -12,7 +12,7 @@ import re
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -58,6 +58,26 @@ class EntradaMensaje:
     mensaje_base: str
 
 
+@dataclass(frozen=True)
+class MensajeChat:
+    rol: Literal["cliente", "asistente"]
+    texto: str
+
+
+@dataclass(frozen=True)
+class Herramienta:
+    """Una función que el asistente puede pedir ejecutar (function calling).
+
+    La ejecuta el backend, nunca la IA, y ya viene atada al cliente con sesión: la IA solo
+    elige cuál llamar y con qué argumentos; no puede pedir datos de otro cliente.
+    """
+
+    nombre: str
+    descripcion: str
+    parametros: dict[str, Any]  # JSON Schema de los argumentos
+    ejecutar: Callable[[dict[str, Any]], dict[str, Any]]
+
+
 # ---------- Lo que responde (validado) ----------
 
 
@@ -84,6 +104,12 @@ class MensajeRedactado(BaseModel):
     mensaje: str = Field(description="El mensaje para el cliente, en una o dos frases")
 
 
+class RespuestaAsistente(BaseModel):
+    texto: str
+    # Funciones que se ejecutaron y lo que devolvieron (para verificar la respuesta).
+    consultas: list[dict[str, Any]] = Field(default_factory=list)
+
+
 @dataclass(frozen=True)
 class Uso:
     """Consumo de una llamada (para el registro de costo)."""
@@ -107,6 +133,10 @@ class ProveedorIA(Protocol):
     def analizar_foto(self, entrada: EntradaFoto) -> RespuestaIA[AnalisisFoto]: ...
 
     def redactar_mensaje(self, entrada: EntradaMensaje) -> RespuestaIA[MensajeRedactado]: ...
+
+    def conversar(
+        self, instrucciones: str, mensajes: list[MensajeChat], herramientas: list[Herramienta]
+    ) -> RespuestaIA[RespuestaAsistente]: ...
 
 
 # ---------- Proveedor simulado ----------
@@ -217,9 +247,47 @@ class ProveedorSimulado:
             redactado = MensajeRedactado(mensaje=f"{saludo} {entrada.mensaje_base}".strip())
         return RespuestaIA(redactado, self._uso(entrada.mensaje_base))
 
+    def conversar(
+        self, instrucciones: str, mensajes: list[MensajeChat], herramientas: list[Herramienta]
+    ) -> RespuestaIA[RespuestaAsistente]:
+        """Busca un código en la última pregunta y llama a la función que corresponda."""
+        pregunta = mensajes[-1].texto
+        por_nombre = {h.nombre: h for h in herramientas}
+        if codigo := re.search(r"RC-\d{4}-\d{6}", pregunta.upper()):
+            nombre, argumentos = "consultar_estado_reclamo", {"codigo": codigo.group()}
+        elif codigo := re.search(r"BY-\d{6}", pregunta.upper()):
+            nombre, argumentos = "consultar_pedido", {"codigo": codigo.group()}
+        elif "reclamo" in normalizar(pregunta):
+            nombre, argumentos = "mis_reclamos", {}
+        else:
+            texto = (
+                "Puedo contarte cómo va tu reclamo o qué tenía tu pedido. "
+                "Dime su código: el de un reclamo empieza con RC y el de un pedido, con BY."
+            )
+            return RespuestaIA(RespuestaAsistente(texto=texto), self._uso(pregunta))
+        resultado = por_nombre[nombre].ejecutar(argumentos)
+        consulta = {"funcion": nombre, "argumentos": argumentos, "resultado": resultado}
+        respuesta = RespuestaAsistente(texto=_resumir(resultado), consultas=[consulta])
+        return RespuestaIA(respuesta, self._uso(pregunta))
+
     def _uso(self, texto: str) -> Uso:
         # Aproximación de tokens (≈ 4 caracteres por token) para que el registro tenga datos.
         return Uso(self.modelo, tokens_entrada=len(texto) // 4 + 50, tokens_salida=40)
+
+
+def _resumir(resultado: dict[str, Any]) -> str:
+    """Respuesta del asistente simulado a partir de lo que devolvió la función."""
+    if "error" in resultado:
+        return str(resultado["error"])
+    if "reclamos" in resultado:
+        lista = "; ".join(f"{r['codigo']}: {r['estado']}" for r in resultado["reclamos"])
+        return f"Tus reclamos más recientes son {lista}." if lista else "No tienes reclamos."
+    if "estado_reclamo" in resultado:
+        return (
+            f"Tu reclamo {resultado['codigo']} está así: {resultado['estado_reclamo']}. "
+            f"{resultado['ultimo_mensaje']}"
+        )
+    return f"Tu pedido {resultado['codigo']} está {resultado['estado']}, por {resultado['total']}."
 
 
 SALUDOS_SIMULADOS = {

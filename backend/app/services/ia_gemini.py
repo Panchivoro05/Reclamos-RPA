@@ -26,7 +26,10 @@ from app.services.ia import (
     EntradaMensaje,
     EntradaTexto,
     ErrorIA,
+    Herramienta,
+    MensajeChat,
     MensajeRedactado,
+    RespuestaAsistente,
     RespuestaIA,
     Uso,
 )
@@ -84,6 +87,10 @@ Reglas estrictas:
 números, ni enlaces.
 - No menciones procesos internos (revisiones antifraude, inteligencia artificial, reglas).
 - Puedes pedir disculpas por el inconveniente y agradecer la paciencia."""
+
+
+# Rondas máximas de "pedir función → recibir resultado" por pregunta: evita bucles.
+MAXIMO_RONDAS = 4
 
 
 class ModelosGemini(Protocol):
@@ -161,6 +168,93 @@ class ProveedorGemini:
             timeout_s=self.timeout_mensaje_s,
         )
 
+    def conversar(
+        self, instrucciones: str, mensajes: list[MensajeChat], herramientas: list[Herramienta]
+    ) -> RespuestaIA[RespuestaAsistente]:
+        """Function calling manual: Gemini pide funciones, el backend las ejecuta y le devuelve
+        el resultado, hasta que responde con texto. La IA nunca ejecuta nada por su cuenta."""
+        por_nombre = {h.nombre: h for h in herramientas}
+        config = types.GenerateContentConfig(
+            system_instruction=instrucciones,
+            tools=[
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration(
+                            name=h.nombre,
+                            description=h.descripcion,
+                            parameters_json_schema=h.parametros,
+                        )
+                        for h in herramientas
+                    ]
+                )
+            ],
+            # Las funciones las ejecuta este código, no el SDK.
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            temperature=0.3,
+            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
+        )
+        contenidos: list[types.Content] = [
+            types.Content(
+                role="user" if m.rol == "cliente" else "model", parts=[types.Part(text=m.texto)]
+            )
+            for m in mensajes
+        ]
+        consultas: list[dict[str, Any]] = []
+        tokens_entrada = tokens_salida = 0
+        modelo = self.modelo
+        for _ in range(MAXIMO_RONDAS):
+            respuesta = self._llamar(contenidos, config)
+            uso = self._uso(respuesta)
+            tokens_entrada += uso.tokens_entrada
+            tokens_salida += uso.tokens_salida
+            modelo = uso.modelo
+            llamadas = respuesta.function_calls or []
+            if not llamadas:
+                texto = respuesta.text
+                if not texto:
+                    raise ErrorIA("Gemini no devolvió una respuesta (¿bloqueada por seguridad?)")
+                return RespuestaIA(
+                    RespuestaAsistente(texto=texto, consultas=consultas),
+                    Uso(modelo, tokens_entrada, tokens_salida),
+                )
+            # Se devuelve el contenido completo del modelo (incluye su "thought signature",
+            # que Gemini 3 exige para continuar) y luego el resultado de cada función.
+            candidato = respuesta.candidates[0] if respuesta.candidates else None
+            if candidato is None or candidato.content is None:
+                raise ErrorIA("Gemini pidió funciones sin devolver su contenido")
+            contenidos.append(candidato.content)
+            partes = []
+            for llamada in llamadas:
+                nombre = llamada.name or ""
+                argumentos = dict(llamada.args or {})
+                herramienta = por_nombre.get(nombre)
+                resultado = (
+                    herramienta.ejecutar(argumentos)
+                    if herramienta
+                    else {"error": f"La función {nombre} no existe"}
+                )
+                consultas.append(
+                    {"funcion": nombre, "argumentos": argumentos, "resultado": resultado}
+                )
+                parte = types.Part.from_function_response(name=nombre, response=resultado)
+                if parte.function_response is not None:
+                    parte.function_response.id = llamada.id
+                partes.append(parte)
+            contenidos.append(types.Content(role="user", parts=partes))
+        raise ErrorIA(f"Gemini no terminó de responder tras {MAXIMO_RONDAS} rondas de funciones")
+
+    def _llamar(
+        self, contenidos: Any, config: types.GenerateContentConfig
+    ) -> types.GenerateContentResponse:
+        try:
+            return self._modelos.generate_content(
+                model=self.modelo, contents=contenidos, config=config
+            )
+        except errors.APIError as error:
+            raise ErrorIA(f"Gemini respondió {error.code}: {error.message}") from error
+        except (httpx.HTTPError, httpx2.HTTPError) as error:  # el SDK usa httpx2 (o httpx)
+            raise ErrorIA(f"No se pudo conectar con Gemini: {error}") from error
+
     def _generar[T: BaseModel](
         self,
         contenido: Any,
@@ -187,15 +281,7 @@ class ProveedorGemini:
                 else None
             ),
         )
-        try:
-            respuesta = self._modelos.generate_content(
-                model=self.modelo, contents=contenido, config=config
-            )
-        except errors.APIError as error:
-            raise ErrorIA(f"Gemini respondió {error.code}: {error.message}") from error
-        except (httpx.HTTPError, httpx2.HTTPError) as error:  # el SDK usa httpx2 (o httpx)
-            raise ErrorIA(f"No se pudo conectar con Gemini: {error}") from error
-
+        respuesta = self._llamar(contenido, config)
         texto = respuesta.text
         if not texto:
             raise ErrorIA("Gemini no devolvió contenido (¿bloqueado por seguridad?)")

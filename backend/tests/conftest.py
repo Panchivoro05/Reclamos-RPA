@@ -153,3 +153,16 @@ def notificaciones_encoladas(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     ids: list[int] = []
     monkeypatch.setattr("app.services.eventos._encolar_notificacion", ids.append)
     return ids
+
+
+@pytest.fixture(autouse=True)
+def consultas_asistente(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    """Contador del límite del asistente en memoria (sin Valkey), limpio en cada prueba."""
+    contador: dict[str, int] = {}
+
+    def incrementar(clave: str) -> int:
+        contador[clave] = contador.get(clave, 0) + 1
+        return contador[clave]
+
+    monkeypatch.setattr("app.services.limites._incrementar", incrementar)
+    return contador
