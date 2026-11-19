@@ -39,7 +39,7 @@ services:
       timeout: 3s
       retries: 10
 
-  # Worker de Celery + bot RPA (oculto). No arranca por defecto:
+  # Worker de Celery + bot RPA (oculto) y worker de notificaciones. No arrancan por defecto:
   #   docker compose -f infra/compose.yml --profile worker up -d --build
   # Para la demo con el navegador visible, ejecuta el worker directo en Fedora (ver README).
   worker:
@@ -69,6 +69,23 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
+
+  # Worker de notificaciones (push): cola aparte para que un aviso no espere al bot.
+  # Usa la misma imagen que el worker (se construye una sola vez) y arranca con el mismo perfil.
+  worker-notificaciones:
+    profiles: [worker]
+    image: reclamos-rpa-worker
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - path: ../.env
+        required: false
+    command:
+      ["celery", "-A", "app.worker", "worker", "-Q", "notificaciones", "-c", "4",
+       "-n", "notificaciones@%h", "--loglevel", "info"]
+    depends_on:
+      worker:
+        condition: service_started
 
 volumes:
   pg_data:
