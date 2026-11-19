@@ -1,22 +1,36 @@
 """Datos de prueba de BurgerYa.
 
-Uso: python -m app.seed
+Uso: python -m app.seed                        # menú, clientes y pedidos
+     python -m app.seed --reiniciar-reclamos    # además borra todos los reclamos (demo limpia)
 
 Es idempotente: se puede ejecutar varias veces sin duplicar nada. Cada ejecución
 recalcula las fechas de los pedidos demo respecto de la hora actual, así el pedido
 "entregado hace 30 minutos" sigue dentro del plazo de reclamo el día de la demo.
 """
 
+import argparse
 import logging
+import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import SessionLocal
-from app.models import CategoriaProducto, Cliente, EstadoPedido, Pedido, PedidoItem, Producto
+from app.models import (
+    CategoriaProducto,
+    Cliente,
+    EstadoPedido,
+    Pedido,
+    PedidoItem,
+    Producto,
+    Reclamo,
+)
+from app.services.almacenamiento import PATRON_NOMBRE
 from app.services.reglas import asegurar_configuracion
 
 logger = logging.getLogger(__name__)
@@ -222,10 +236,37 @@ def seed(session: Session, ahora: datetime | None = None) -> None:
     asegurar_configuracion(session)
 
 
+def reiniciar_reclamos(session: Session, carpeta_archivos: Path) -> int:
+    """Borra TODOS los reclamos (con eventos, ítems y ejecuciones del bot) y su evidencia.
+
+    Solo para desarrollo y demos: deja el correlativo otra vez en RC-AAAA-000001.
+    No toca pedidos, clientes, productos ni reglas.
+    """
+    fotos = [r for r in session.scalars(select(Reclamo.foto_ruta)) if r]
+    cantidad = session.execute(delete(Reclamo)).rowcount
+    session.execute(text("ALTER SEQUENCE reclamo_codigo_seq RESTART"))
+    session.commit()
+    for foto in fotos:
+        if PATRON_NOMBRE.match(foto):
+            (carpeta_archivos / foto).unlink(missing_ok=True)
+    shutil.rmtree(carpeta_archivos / "evidencias", ignore_errors=True)
+    return cantidad
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    parser = argparse.ArgumentParser(prog="python -m app.seed", description=__doc__)
+    parser.add_argument(
+        "--reiniciar-reclamos",
+        action="store_true",
+        help="borra todos los reclamos y su evidencia (solo desarrollo)",
+    )
+    args = parser.parse_args()
     with SessionLocal() as session:
         seed(session)
+        if args.reiniciar_reclamos:
+            borrados = reiniciar_reclamos(session, get_settings().upload_dir)
+            logger.info("Reclamos borrados: %d (el próximo será RC-AAAA-000001).", borrados)
     logger.info(
         "Datos de prueba listos: %d productos, %d clientes, %d pedidos.",
         len(MENU),

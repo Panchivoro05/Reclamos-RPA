@@ -1,11 +1,14 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
+from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Cliente, EstadoPedido, Pedido, PedidoItem, Producto
-from app.seed import seed
+from app.models import Cliente, EstadoPedido, Pedido, PedidoItem, Producto, Reclamo
+from app.seed import reiniciar_reclamos, seed
+from tests.utils import crear_reclamo
 
 
 def _contar(db: Session, modelo: type) -> int:
@@ -36,3 +39,20 @@ def test_seed_recalcula_fechas_respecto_de_ahora(db: Session) -> None:
     pedido = db.scalars(select(Pedido).where(Pedido.codigo == "BY-000101")).one()
     assert pedido.estado is EstadoPedido.ENTREGADO
     assert pedido.entregado_en == ahora + timedelta(days=1) - timedelta(minutes=30)
+
+
+def test_reiniciar_reclamos_borra_reclamos_y_evidencia(
+    client: TestClient, db: Session, datos: None, tmp_path: Path
+) -> None:
+    assert crear_reclamo(client).status_code == 201
+    evidencia = tmp_path / "evidencias" / "RC-2026-000001" / "intento-1"
+    evidencia.mkdir(parents=True)
+    (evidencia / "video.webm").write_bytes(b"x")
+
+    assert reiniciar_reclamos(db, tmp_path) == 1
+    assert db.scalar(select(func.count(Reclamo.id))) == 0
+    assert not (tmp_path / "evidencias").exists()
+    # Los pedidos siguen y el correlativo vuelve a empezar.
+    assert db.scalar(select(func.count(Pedido.id))) == 8
+    nuevo = crear_reclamo(client)
+    assert nuevo.json()["codigo"].endswith("-000001")
