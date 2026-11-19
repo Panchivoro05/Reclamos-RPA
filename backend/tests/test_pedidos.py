@@ -40,6 +40,7 @@ def test_detalle_con_items_y_montos(client: TestClient, datos: None) -> None:
         "cantidad": 2,
         "precio_unitario": "27.90",
         "subtotal": "55.80",
+        "cantidad_reclamable": 2,
     }
 
 

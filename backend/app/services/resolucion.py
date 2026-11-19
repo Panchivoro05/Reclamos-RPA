@@ -18,12 +18,26 @@ from app.core.moneda import formato_soles, redondear
 from app.core.tiempo import ahora_utc
 from app.models import (
     BaseMonto,
+    EstadoReclamo,
     PoliticaAntifraude,
     Reclamo,
     ReglaResolucion,
     SolucionCompensacion,
 )
 from app.services.reglas import obtener_politica, obtener_regla
+
+SOLUCIONES_REEMBOLSO = frozenset(
+    {SolucionCompensacion.REEMBOLSO_PARCIAL, SolucionCompensacion.REEMBOLSO_TOTAL}
+)
+# Reclamos cuya compensación ya está aprobada o registrada (cuentan para el saldo del pedido).
+ESTADOS_COMPENSADOS = frozenset(
+    {
+        EstadoReclamo.VALIDADO,
+        EstadoReclamo.EN_RESOLUCION,
+        EstadoReclamo.RESUELTO,
+        EstadoReclamo.CERRADO,
+    }
+)
 
 SOLUCIONES_CON_DINERO = frozenset(
     {
@@ -86,10 +100,12 @@ def evaluar_reclamo(
     regla: ReglaResolucion | None,
     politica: PoliticaAntifraude,
     reclamos_en_periodo: int,
+    ya_reembolsado: Decimal = Decimal("0"),
 ) -> Decision:
     """Aplica la regla y TODOS los controles (el agente ve cada motivo, no solo el primero).
 
     `reclamos_en_periodo` son los OTROS reclamos del cliente en los últimos días de la política.
+    `ya_reembolsado` es lo que otros reclamos ya devolvieron (o van a devolver) de este pedido.
     """
     if regla is None or not regla.activa:
         return Decision(
@@ -153,7 +169,25 @@ def evaluar_reclamo(
                 Control("monto", True, f"Monto {formato_soles(monto)} dentro del límite")
             )
 
+    if regla.solucion in SOLUCIONES_REEMBOLSO:
+        controles.append(_control_saldo(reclamo.pedido.total, ya_reembolsado, monto))
+
     return Decision(solucion=regla.solucion, monto=monto, controles=controles)
+
+
+def _control_saldo(total: Decimal, ya_reembolsado: Decimal, monto: Decimal) -> Control:
+    """Lo devuelto de un pedido nunca supera su total (la misma regla que aplica SISCAJA, pero
+    revisada antes de lanzar el bot)."""
+    saldo = max(total - ya_reembolsado, Decimal("0"))
+    if monto > saldo:
+        return Control(
+            "saldo_pedido",
+            False,
+            f"El pedido ya tiene {formato_soles(ya_reembolsado)} reembolsados de "
+            f"{formato_soles(total)}: el saldo ({formato_soles(saldo)}) no alcanza para "
+            f"{formato_soles(monto)}",
+        )
+    return Control("saldo_pedido", True, f"Saldo reembolsable del pedido: {formato_soles(saldo)}")
 
 
 def contar_reclamos_en_periodo(
@@ -169,12 +203,29 @@ def contar_reclamos_en_periodo(
     return int(session.scalar(consulta) or 0)
 
 
+def reembolsado_en_pedido(session: Session, reclamo: Reclamo) -> Decimal:
+    """Lo que OTROS reclamos del mismo pedido ya reembolsaron o tienen aprobado reembolsar."""
+    consulta = select(func.coalesce(func.sum(Reclamo.monto_compensacion), 0)).where(
+        Reclamo.pedido_id == reclamo.pedido_id,
+        Reclamo.id != reclamo.id,
+        Reclamo.solucion.in_(SOLUCIONES_REEMBOLSO),
+        Reclamo.estado.in_(ESTADOS_COMPENSADOS),
+    )
+    return Decimal(session.scalar(consulta) or 0)
+
+
 def decidir(session: Session, reclamo: Reclamo, ahora: datetime | None = None) -> Decision:
     politica = obtener_politica(session)
     previos = contar_reclamos_en_periodo(
         session, reclamo, politica.periodo_dias, ahora or ahora_utc()
     )
-    return evaluar_reclamo(reclamo, obtener_regla(session, reclamo.tipo), politica, previos)
+    return evaluar_reclamo(
+        reclamo,
+        obtener_regla(session, reclamo.tipo),
+        politica,
+        previos,
+        reembolsado_en_pedido(session, reclamo),
+    )
 
 
 def describir_compensacion(solucion: SolucionCompensacion, monto: Decimal) -> str:

@@ -19,4 +19,5 @@ def obtener_pedido(db: DbSession, cliente: ClienteActual, codigo: str) -> Pedido
         pedido,
         reclamos.tipos_disponibles(db, pedido),
         reglas.tipos_con_foto_obligatoria(db),
+        pedidos.unidades_reclamadas(db, pedido),
     )

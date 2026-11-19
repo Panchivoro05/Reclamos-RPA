@@ -91,7 +91,7 @@ function Formulario({ pedido }: { pedido: PedidoDetalle }) {
       items: pedido.items.map((item) => ({
         pedido_item_id: item.id,
         cantidad_afectada: 0,
-        maximo: item.cantidad,
+        maximo: item.cantidad_reclamable,
       })),
       foto: null,
     },
@@ -186,7 +186,8 @@ function Formulario({ pedido }: { pedido: PedidoDetalle }) {
                   render={({ field }) => (
                     <SelectorCantidad
                       producto={item.producto}
-                      maximo={item.cantidad}
+                      pedidas={item.cantidad}
+                      maximo={item.cantidad_reclamable}
                       valor={field.value}
                       onChange={field.onChange}
                     />
@@ -320,13 +321,21 @@ function OpcionTipo({
   );
 }
 
+function detalleCantidad(pedidas: number, reclamables: number): string {
+  if (reclamables === pedidas) return `Pediste ${pedidas}`;
+  if (reclamables === 0) return 'Ya está en otro reclamo';
+  return `Pediste ${pedidas} · puedes reclamar ${reclamables}`;
+}
+
 function SelectorCantidad({
   producto,
+  pedidas,
   maximo,
   valor,
   onChange,
 }: {
   producto: string;
+  pedidas: number;
   maximo: number;
   valor: number;
   onChange: (valor: number) => void;
@@ -340,7 +349,7 @@ function SelectorCantidad({
     >
       <View className="flex-1">
         <Text className="font-medium text-neutral-900">{producto}</Text>
-        <Text className="text-xs text-neutral-500">Pediste {maximo}</Text>
+        <Text className="text-xs text-neutral-500">{detalleCantidad(pedidas, maximo)}</Text>
       </View>
       <BotonCantidad
         icono="remove"

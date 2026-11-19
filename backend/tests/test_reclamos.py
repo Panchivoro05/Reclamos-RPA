@@ -106,6 +106,48 @@ def test_cantidad_excedida(client: TestClient, datos: None) -> None:
     assert "Pediste 2" in respuesta.json()["detail"]
 
 
+def _cerrar_reclamos(db: Session) -> None:
+    """Marca como resueltos los reclamos existentes (así se puede reclamar de nuevo el tipo)."""
+    db.execute(update(Reclamo).values(estado=EstadoReclamo.RESUELTO))
+    db.commit()
+
+
+def test_una_unidad_no_se_reclama_dos_veces(
+    client: TestClient, db: Session, datos: None, foto_png: bytes
+) -> None:
+    combo = item_id(client, "BY-000101")  # se pidieron 2
+    uno = [{"pedido_item_id": combo, "cantidad_afectada": 1}]
+    assert crear_reclamo(client, items=uno).status_code == 201
+    _cerrar_reclamos(db)
+
+    # Quedaba 1: pedir 2 se rechaza diciendo cuántas quedan.
+    respuesta = crear_reclamo(client, items=[{"pedido_item_id": combo, "cantidad_afectada": 2}])
+    assert respuesta.status_code == 422
+    assert respuesta.json()["codigo"] == "item_ya_reclamado"
+    assert "Ya reclamaste 1 de 2" in respuesta.json()["detail"]
+    assert "puedes reclamar 1 más" in respuesta.json()["detail"]
+
+    assert crear_reclamo(client, items=uno).status_code == 201
+    _cerrar_reclamos(db)
+
+    # Ya no queda ninguna, aunque sea otro tipo de reclamo.
+    respuesta = crear_reclamo(
+        client, tipo="mal_estado", items=uno, foto=("f.png", foto_png, "image/png")
+    )
+    assert respuesta.status_code == 422
+    assert respuesta.json()["codigo"] == "item_ya_reclamado"
+    assert "Mis reclamos" in respuesta.json()["detail"]
+
+
+def test_el_pedido_muestra_cuanto_queda_por_reclamar(client: TestClient, datos: None) -> None:
+    combo = item_id(client, "BY-000101")
+    crear_reclamo(client, items=[{"pedido_item_id": combo, "cantidad_afectada": 1}])
+    items = client.get("/api/v1/pedidos/BY-000101", headers=CLIENTE1).json()["items"]
+    assert [(i["cantidad"], i["cantidad_reclamable"]) for i in items if i["id"] == combo] == [
+        (2, 1)
+    ]
+
+
 def test_item_repetido(client: TestClient, datos: None) -> None:
     combo = item_id(client, "BY-000101")
     items = [{"pedido_item_id": combo, "cantidad_afectada": 1}] * 2

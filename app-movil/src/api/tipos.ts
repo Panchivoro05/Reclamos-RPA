@@ -46,6 +46,8 @@ export interface PedidoItem {
   cantidad: number;
   precio_unitario: Monto;
   subtotal: Monto;
+  /** Unidades que aún se pueden reclamar (las demás ya están en otro reclamo). */
+  cantidad_reclamable: number;
 }
 
 export interface PedidoDetalle extends PedidoResumen {

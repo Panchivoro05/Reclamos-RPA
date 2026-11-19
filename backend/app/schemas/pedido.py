@@ -17,9 +17,11 @@ class PedidoItemOut(BaseModel):
     cantidad: int
     precio_unitario: Decimal
     subtotal: Decimal
+    # Unidades que todavía se pueden reclamar (las demás ya están en otro reclamo).
+    cantidad_reclamable: int
 
     @classmethod
-    def desde(cls, item: PedidoItem) -> Self:
+    def desde(cls, item: PedidoItem, reclamadas: int = 0) -> Self:
         return cls(
             id=item.id,
             producto=item.producto.nombre,
@@ -27,6 +29,7 @@ class PedidoItemOut(BaseModel):
             cantidad=item.cantidad,
             precio_unitario=item.precio_unitario,
             subtotal=item.precio_unitario * item.cantidad,
+            cantidad_reclamable=max(item.cantidad - reclamadas, 0),
         )
 
 
@@ -66,11 +69,15 @@ class PedidoDetalle(PedidoResumen):
         pedido: Pedido,
         tipos_disponibles: list[TipoReclamo],
         tipos_con_foto: list[TipoReclamo],
+        unidades_reclamadas: dict[int, int],
     ) -> Self:
         return cls(
             **PedidoResumen.desde(pedido).model_dump(),
             direccion_entrega=pedido.direccion_entrega,
-            items=[PedidoItemOut.desde(item) for item in pedido.items],
+            items=[
+                PedidoItemOut.desde(item, unidades_reclamadas.get(item.id, 0))
+                for item in pedido.items
+            ],
             tipos_reclamo_disponibles=tipos_disponibles,
             tipos_con_foto_obligatoria=tipos_con_foto,
         )

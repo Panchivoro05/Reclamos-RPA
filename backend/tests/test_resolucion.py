@@ -13,6 +13,7 @@ from app.core.moneda import formato_soles
 from app.core.tiempo import ahora_utc
 from app.models import (
     BaseMonto,
+    EstadoReclamo,
     Pedido,
     PedidoItem,
     PoliticaAntifraude,
@@ -28,6 +29,7 @@ from app.services.resolucion import (
     decidir,
     describir_compensacion,
     evaluar_reclamo,
+    reembolsado_en_pedido,
 )
 from tests.utils import CLIENTE2, crear_reclamo, item_id
 
@@ -151,6 +153,24 @@ def test_reenvio_no_tiene_control_de_monto() -> None:
     assert decision.monto == Decimal("0.00")
 
 
+def test_no_se_reembolsa_mas_que_el_saldo_del_pedido() -> None:
+    # Pedido de S/ 82.50 con S/ 60.00 ya reembolsados: quedan S/ 22.50.
+    decision = evaluar_reclamo(reclamo([(1, "27.90")]), regla(), POLITICA, 0, Decimal("60"))
+    assert not decision.aprobada
+    assert decision.motivo_escalamiento == (
+        "El pedido ya tiene S/ 60.00 reembolsados de S/ 82.50: el saldo (S/ 22.50) "
+        "no alcanza para S/ 27.90"
+    )
+    justo = evaluar_reclamo(reclamo([(1, "22.50")]), regla(), POLITICA, 0, Decimal("60"))
+    assert justo.aprobada
+
+
+def test_el_saldo_solo_limita_reembolsos() -> None:
+    """SISCAJA solo limita los reembolsos por el saldo; un cupón o un reenvío no lo usan."""
+    cupon = regla(solucion=SolucionCompensacion.CUPON, base_monto=BaseMonto.FIJO, valor="10")
+    assert evaluar_reclamo(reclamo(), cupon, POLITICA, 0, Decimal("82.50")).aprobada
+
+
 @pytest.mark.parametrize("regla_del_tipo", [None, regla(activa=False)])
 def test_sin_regla_activa_va_a_revision_humana(regla_del_tipo: ReglaResolucion | None) -> None:
     decision = evaluar_reclamo(reclamo([(1, "5")]), regla_del_tipo, POLITICA, 0)
@@ -220,3 +240,23 @@ def test_contar_reclamos_en_periodo(client: TestClient, db: Session, datos: None
         client, db, pedido_codigo="BY-000106", tipo="demora", items=[], headers=CLIENTE2
     )
     assert contar_reclamos_en_periodo(db, primero, 30, ahora_utc()) == 1
+
+
+def test_reembolsado_en_pedido(client: TestClient, db: Session, datos: None) -> None:
+    combo = item_id(client, "BY-000101", 0)
+    uno = [{"pedido_item_id": combo, "cantidad_afectada": 1}]
+    primero = _reclamo_creado(client, db, items=uno)
+    primero.solucion = SolucionCompensacion.REEMBOLSO_PARCIAL
+    primero.monto_compensacion = Decimal("27.90")
+    primero.estado = EstadoReclamo.RESUELTO
+    db.commit()
+    segundo = _reclamo_creado(client, db, items=uno)
+
+    assert reembolsado_en_pedido(db, segundo) == Decimal("27.90")
+    # El propio reclamo no cuenta, y uno escalado (sin compensar) tampoco.
+    assert reembolsado_en_pedido(db, primero) == Decimal("0")
+    segundo.estado = EstadoReclamo.RESUELTO  # solo puede haber uno abierto por tipo
+    db.commit()
+    primero.estado = EstadoReclamo.ESCALADO
+    db.commit()
+    assert reembolsado_en_pedido(db, segundo) == Decimal("0")

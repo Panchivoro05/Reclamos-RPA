@@ -28,7 +28,7 @@ from app.models.enums import ESTADOS_RECLAMO_ABIERTO
 from app.schemas.reclamo import ReclamoItemEntrada
 from app.services.almacenamiento import PATRON_NOMBRE, AlmacenamientoArchivos
 from app.services.eventos import CambioEstado, publicar_cambio
-from app.services.pedidos import obtener_pedido
+from app.services.pedidos import obtener_pedido, unidades_reclamadas
 from app.services.reglas import tipos_con_foto_obligatoria
 
 TIPOS_MIME = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
@@ -107,7 +107,12 @@ def _validar_pedido_reclamable(pedido: Pedido, tipo: TipoReclamo, ahora: datetim
         )
 
 
-def _validar_items(pedido: Pedido, tipo: TipoReclamo, items: list[ReclamoItemEntrada]) -> None:
+def _validar_items(
+    pedido: Pedido,
+    tipo: TipoReclamo,
+    items: list[ReclamoItemEntrada],
+    reclamadas: dict[int, int],
+) -> None:
     if not items and tipo is not TipoReclamo.DEMORA:
         raise ReglaNegocio(
             "items_requeridos", "Indica qué productos del pedido tuvieron el problema."
@@ -131,6 +136,19 @@ def _validar_items(pedido: Pedido, tipo: TipoReclamo, items: list[ReclamoItemEnt
                 "cantidad_excedida",
                 f"Pediste {item_pedido.cantidad} de {item_pedido.producto.nombre}; "
                 f"no puedes reclamar {entrada.cantidad_afectada}.",
+            )
+        ya_reclamadas = reclamadas.get(entrada.pedido_item_id, 0)
+        if ya_reclamadas + entrada.cantidad_afectada > item_pedido.cantidad:
+            disponibles = max(item_pedido.cantidad - ya_reclamadas, 0)
+            raise ReglaNegocio(
+                "item_ya_reclamado",
+                f"Ya reclamaste {ya_reclamadas} de {item_pedido.cantidad} "
+                f"{item_pedido.producto.nombre} de este pedido"
+                + (
+                    f"; puedes reclamar {disponibles} más."
+                    if disponibles
+                    else ". Puedes ver ese reclamo en Mis reclamos."
+                ),
             )
 
 
@@ -214,7 +232,7 @@ def crear_reclamo(
 
     pedido = obtener_pedido(session, cliente, pedido_codigo)
     _validar_pedido_reclamable(pedido, tipo, ahora)
-    _validar_items(pedido, tipo, items)
+    _validar_items(pedido, tipo, items, unidades_reclamadas(session, pedido))
     extension = _validar_foto(session, tipo, foto)
     if tipo in _tipos_abiertos(session, pedido):
         raise _reclamo_duplicado()
