@@ -49,7 +49,8 @@ export function Boton({
       ) : (
         icono && <Ionicons name={icono} size={20} color={estilo.icono} />
       )}
-      <Text className={`text-base font-semibold ${estilo.texto}`}>{titulo}</Text>
+      {/* shrink: con letra grande en el celular, el texto baja de línea en vez de cortarse. */}
+      <Text className={`shrink text-center text-base font-semibold ${estilo.texto}`}>{titulo}</Text>
     </Pressable>
   );
 }
