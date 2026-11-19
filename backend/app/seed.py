@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
 from app.models import CategoriaProducto, Cliente, EstadoPedido, Pedido, PedidoItem, Producto
+from app.services.reglas import asegurar_configuracion
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +218,8 @@ def seed(session: Session, ahora: datetime | None = None) -> None:
     session.flush()
     _upsert_pedidos(session, productos, clientes, ahora)
     session.commit()
+    # Reglas y política: solo crea las que falten (no pisa las que hayas cambiado).
+    asegurar_configuracion(session)
 
 
 def main() -> None:

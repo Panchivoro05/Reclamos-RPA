@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.deps import ClienteActual, DbSession
 from app.schemas.pedido import PedidoDetalle, PedidoResumen
-from app.services import pedidos, reclamos
+from app.services import pedidos, reclamos, reglas
 
 router = APIRouter(prefix="/pedidos", tags=["pedidos"])
 
@@ -15,4 +15,8 @@ def listar_pedidos(db: DbSession, cliente: ClienteActual) -> list[PedidoResumen]
 @router.get("/{codigo}")
 def obtener_pedido(db: DbSession, cliente: ClienteActual, codigo: str) -> PedidoDetalle:
     pedido = pedidos.obtener_pedido(db, cliente, codigo)
-    return PedidoDetalle.desde_pedido(pedido, reclamos.tipos_disponibles(db, pedido))
+    return PedidoDetalle.desde_pedido(
+        pedido,
+        reclamos.tipos_disponibles(db, pedido),
+        reglas.tipos_con_foto_obligatoria(db),
+    )

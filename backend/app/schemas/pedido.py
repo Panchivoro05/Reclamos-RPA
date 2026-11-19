@@ -57,12 +57,20 @@ class PedidoDetalle(PedidoResumen):
     items: list[PedidoItemOut]
     # Vacía si el pedido ya no admite reclamos (la app oculta el botón).
     tipos_reclamo_disponibles: list[TipoReclamo]
+    # Tipos para los que la foto es obligatoria (según las reglas configuradas).
+    tipos_con_foto_obligatoria: list[TipoReclamo]
 
     @classmethod
-    def desde_pedido(cls, pedido: Pedido, tipos_disponibles: list[TipoReclamo]) -> Self:
+    def desde_pedido(
+        cls,
+        pedido: Pedido,
+        tipos_disponibles: list[TipoReclamo],
+        tipos_con_foto: list[TipoReclamo],
+    ) -> Self:
         return cls(
             **PedidoResumen.desde(pedido).model_dump(),
             direccion_entrega=pedido.direccion_entrega,
             items=[PedidoItemOut.desde(item) for item in pedido.items],
             tipos_reclamo_disponibles=tipos_disponibles,
+            tipos_con_foto_obligatoria=tipos_con_foto,
         )

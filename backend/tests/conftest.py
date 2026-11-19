@@ -36,6 +36,7 @@ from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
 from app.seed import seed  # noqa: E402
 from app.services.almacenamiento import AlmacenamientoLocal, get_almacenamiento  # noqa: E402
+from app.services.reglas import asegurar_configuracion  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -67,6 +68,9 @@ def _vaciar_tablas() -> Iterator[None]:
     with engine.begin() as conn:
         conn.execute(text(f"TRUNCATE {tablas} RESTART IDENTITY CASCADE"))
         conn.execute(text("ALTER SEQUENCE reclamo_codigo_seq RESTART"))
+    # Las reglas y la política vuelven a sus valores iniciales para la siguiente prueba.
+    with SessionLocal() as session:
+        asegurar_configuracion(session, restablecer=True)
 
 
 @pytest.fixture

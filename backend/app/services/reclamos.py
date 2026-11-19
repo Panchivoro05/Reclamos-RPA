@@ -28,8 +28,8 @@ from app.models.enums import ESTADOS_RECLAMO_ABIERTO
 from app.schemas.reclamo import ReclamoItemEntrada
 from app.services.almacenamiento import PATRON_NOMBRE, AlmacenamientoArchivos
 from app.services.pedidos import obtener_pedido
+from app.services.reglas import tipos_con_foto_obligatoria
 
-TIPOS_CON_FOTO_OBLIGATORIA = frozenset({TipoReclamo.PRODUCTO_EQUIVOCADO, TipoReclamo.MAL_ESTADO})
 TIPOS_MIME = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
 MENSAJE_RECIBIDO = "Recibimos tu reclamo. Lo estamos revisando y te avisaremos por aquí."
@@ -133,10 +133,13 @@ def _validar_items(pedido: Pedido, tipo: TipoReclamo, items: list[ReclamoItemEnt
             )
 
 
-def _validar_foto(tipo: TipoReclamo, foto: bytes | None) -> str | None:
-    """Valida la foto y devuelve su extensión (None si no se envió)."""
+def _validar_foto(session: Session, tipo: TipoReclamo, foto: bytes | None) -> str | None:
+    """Valida la foto y devuelve su extensión (None si no se envió).
+
+    Si es obligatoria lo dice la regla del tipo (tabla reglas_resolucion).
+    """
     if not foto:
-        if tipo in TIPOS_CON_FOTO_OBLIGATORIA:
+        if tipo in tipos_con_foto_obligatoria(session):
             raise ReglaNegocio(
                 "foto_requerida", "Para este tipo de reclamo necesitamos una foto del producto."
             )
@@ -211,7 +214,7 @@ def crear_reclamo(
     pedido = obtener_pedido(session, cliente, pedido_codigo)
     _validar_pedido_reclamable(pedido, tipo, ahora)
     _validar_items(pedido, tipo, items)
-    extension = _validar_foto(tipo, foto)
+    extension = _validar_foto(session, tipo, foto)
     if tipo in _tipos_abiertos(session, pedido):
         raise _reclamo_duplicado()
 

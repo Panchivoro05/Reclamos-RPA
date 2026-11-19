@@ -45,3 +45,22 @@ class ActorEvento(StrEnum):
     BOT = "bot"
     IA = "ia"
     AGENTE = "agente"
+
+
+class SolucionCompensacion(StrEnum):
+    """Lo que se registra en SISCAJA para resolver el reclamo (mismos valores que el bot)."""
+
+    REENVIO = "reenvio"
+    REEMBOLSO_PARCIAL = "reembolso_parcial"
+    REEMBOLSO_TOTAL = "reembolso_total"
+    CUPON = "cupon"
+
+
+class BaseMonto(StrEnum):
+    """Cómo se calcula el monto de la compensación a partir de la regla."""
+
+    NINGUNO = "ninguno"  # reenvío: no hay dinero de por medio
+    ITEMS_AFECTADOS = "items_afectados"  # suma de cantidad afectada x precio unitario
+    FIJO = "fijo"  # el valor de la regla, en soles
+    PORCENTAJE_TOTAL = "porcentaje_total"  # el valor de la regla, como % del total del pedido
+    TOTAL_PEDIDO = "total_pedido"  # el total del pedido
