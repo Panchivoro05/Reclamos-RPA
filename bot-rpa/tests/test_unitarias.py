@@ -71,3 +71,22 @@ def test_finalizar_resultado(
     assert datos["pedido"] == "BY-000101"
     assert datos["pasos"][0]["captura"] == "capturas/01_login.png"
     assert datos["video"] is None
+
+
+def test_el_motivo_en_caja_empieza_con_el_codigo_del_reclamo() -> None:
+    base = {"pedido": "BY-000101", "solucion": "cupon"}
+    assert SolicitudBot(**base, motivo="Llegó tarde").motivo_en_caja == "Llegó tarde"
+    con_codigo = SolicitudBot(**base, motivo="Llegó tarde", reclamo="RC-2026-000001")
+    assert con_codigo.motivo_en_caja == "RC-2026-000001 - Llegó tarde"
+    # Si el worker ya lo puso al inicio, no se repite.
+    ya_tiene = SolicitudBot(**base, motivo="RC-2026-000001 - Llegó tarde", reclamo="RC-2026-000001")
+    assert ya_tiene.motivo_en_caja == "RC-2026-000001 - Llegó tarde"
+    with pytest.raises(ValueError, match="reclamo"):
+        SolicitudBot(**base, motivo="x", reclamo="123")
+
+
+def test_xpath_de_la_compensacion_previa_solo_acepta_codigos_validos() -> None:
+    xpath = BotRPA().xpath_compensacion_de_reclamo("RC-2026-000001")
+    assert xpath.startswith("xpath=(") and "'RC-2026-000001 '" in xpath
+    with pytest.raises(ValueError):
+        BotRPA().xpath_compensacion_de_reclamo("x') or ('1'='1")

@@ -27,7 +27,9 @@ from app.models import (
     ReclamoItem,
     TipoReclamo,
 )
+from app.services.almacenamiento import AlmacenamientoArchivos
 from app.services.bot import EjecutorBot, ResultadoBot, SolicitudBot
+from app.services.evidencia import guardar_evidencia
 from app.services.resolucion import decidir, describir_compensacion
 
 logger = logging.getLogger(__name__)
@@ -70,7 +72,9 @@ def procesar_reclamo(
     *,
     intento: int = 1,
     ultimo_intento: bool = True,
+    almacenamiento: AlmacenamientoArchivos | None = None,
 ) -> Resultado:
+    """Avanza el reclamo todo lo posible. Con `almacenamiento`, guarda la evidencia del bot."""
     reclamo = _bloquear(session, reclamo_id)
     if reclamo is None or reclamo.estado not in ESTADOS_PENDIENTES:
         session.rollback()
@@ -119,7 +123,7 @@ def procesar_reclamo(
         # Otro proceso lo terminó mientras el bot trabajaba.
         session.rollback()
         return Resultado.SIN_CAMBIOS
-    _registrar_ejecucion(session, reclamo, resultado, intento)
+    _registrar_ejecucion(session, reclamo, resultado, intento, almacenamiento)
 
     if resultado.exito:
         assert reclamo.solucion is not None and reclamo.monto_compensacion is not None
@@ -226,8 +230,19 @@ def _solicitud_para_el_bot(reclamo: Reclamo) -> SolicitudBot:
 
 
 def _registrar_ejecucion(
-    session: Session, reclamo: Reclamo, resultado: ResultadoBot, intento: int
+    session: Session,
+    reclamo: Reclamo,
+    resultado: ResultadoBot,
+    intento: int,
+    almacenamiento: AlmacenamientoArchivos | None,
 ) -> None:
+    evidencia = None
+    if almacenamiento is not None:
+        try:
+            evidencia = guardar_evidencia(almacenamiento, resultado, reclamo.codigo, intento)
+        except OSError:
+            # Sin evidencia el reclamo igual se resuelve: el resultado ya está en SISCAJA.
+            logger.exception("No se pudo guardar la evidencia del reclamo %s", reclamo.codigo)
     session.add(
         EjecucionBot(
             reclamo_id=reclamo.id,
@@ -238,5 +253,7 @@ def _registrar_ejecucion(
             numero_operacion=resultado.numero_operacion,
             duracion_s=resultado.duracion_s,
             pasos=resultado.pasos,
+            evidencia=evidencia.carpeta if evidencia else None,
+            video=evidencia.video if evidencia else None,
         )
     )

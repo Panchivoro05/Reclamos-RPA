@@ -141,3 +141,26 @@ def test_la_clave_no_queda_en_ninguna_salida(
     for archivo in Path(resultado.carpeta).rglob("*"):
         if archivo.is_file() and archivo.suffix in {".json", ".xml", ".html", ".txt", ".log"}:
             assert ajustes.operador_clave not in archivo.read_text(errors="ignore"), archivo
+
+
+def test_un_reintento_no_compensa_dos_veces_el_mismo_reclamo(
+    ajustes: Settings, caja_db: sqlite3.Connection
+) -> None:
+    primero = resolver(ajustes, reclamo="RC-2026-000123")
+    assert primero.exito, primero.mensaje
+    assert primero.numero_operacion == "CMP-000001"
+
+    # El worker reintenta (por ejemplo, se cortó justo después de registrar).
+    segundo = resolver(ajustes, reclamo="RC-2026-000123")
+
+    assert segundo.exito, segundo.mensaje
+    assert segundo.numero_operacion == "CMP-000001"
+    assert segundo.monto_registrado == "S/ 10.00"
+    assert segundo.datos["reutilizada"] == "si"
+    assert "formulario" not in [p["paso"] for p in segundo.pasos]
+    (fila,) = compensaciones(caja_db)
+    assert fila["motivo"] == "RC-2026-000123 - Prueba automatica del bot RPA"
+
+    # Otro reclamo del mismo pedido sí registra su propia compensación.
+    otro = resolver(ajustes, reclamo="RC-2026-000124", solucion="cupon", monto="5")
+    assert otro.numero_operacion == "CMP-000002"

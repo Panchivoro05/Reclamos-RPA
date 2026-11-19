@@ -28,6 +28,8 @@ ${MOTIVO}              ${EMPTY}
 ${ITEMS_ESPERADOS}     ${EMPTY}
 # Total esperado del pedido ("82.50"). Vacío: no se compara.
 ${TOTAL_ESPERADO}      ${EMPTY}
+# Código del reclamo. Si ya hay una compensación suya en el pedido, se reutiliza.
+${RECLAMO}             ${EMPTY}
 ${SALIDA}              ${OUTPUT DIR}
 ${VISIBLE}             ${False}
 ${VELOCIDAD_MS}        250
@@ -41,8 +43,13 @@ Resolver Reclamo
     Iniciar Sesion En SISCAJA    ${CAJA_URL}    ${OPERADOR_USUARIO}
     Buscar Pedido    ${PEDIDO}
     Verificar Pedido    ${ITEMS_ESPERADOS}    ${TOTAL_ESPERADO}
-    Registrar Compensacion    ${SOLUCION}    ${MONTO}    ${MOTIVO}
-    Leer Comprobante
+    ${previa}    Buscar Compensacion Previa    ${RECLAMO}
+    IF    $previa
+        Usar Compensacion Previa    ${previa}
+    ELSE
+        Registrar Compensacion    ${SOLUCION}    ${MONTO}    ${MOTIVO}
+        Leer Comprobante
+    END
 
 
 *** Keywords ***

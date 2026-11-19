@@ -78,6 +78,14 @@ class BotRPA:
         )
 
     @keyword
+    def xpath_compensacion_de_reclamo(self, reclamo: str) -> str:
+        """Primera fila del historial del pedido cuyo motivo empieza con el código del reclamo."""
+        if not re.fullmatch(r"RC-\d{4}-\d{6}", reclamo):
+            raise ValueError(f"Codigo de reclamo invalido: {reclamo!r}")
+        filas = "//table[@id='tabla-compensaciones']//tr[contains(@class, 'compensacion')]"
+        return f"xpath=({filas}[starts-with(normalize-space(td[5]), '{reclamo} ')])[1]"
+
+    @keyword
     def ultimo_paso(self) -> str:
         return self.pasos[-1]["paso"] if self.pasos else ""
 

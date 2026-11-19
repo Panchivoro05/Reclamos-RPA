@@ -31,12 +31,24 @@ class SolicitudBot:
     # Lo que el backend sabe del pedido: el bot lo compara con lo que ve en caja.
     items_esperados: list[dict[str, Any]] = field(default_factory=list)
     total_esperado: str = ""
+    # Código del reclamo (RC-2026-000001). Va al inicio del motivo en SISCAJA: si el bot se
+    # reintenta y ya existe una compensación con ese código, la reutiliza en vez de duplicarla.
+    reclamo: str = ""
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"BY-\d{6}", self.pedido):
             raise ValueError(f"Codigo de pedido invalido: {self.pedido!r}")
         if self.solucion not in SOLUCIONES:
             raise ValueError(f"Solucion invalida: {self.solucion!r}")
+        if self.reclamo and not re.fullmatch(r"RC-\d{4}-\d{6}", self.reclamo):
+            raise ValueError(f"Codigo de reclamo invalido: {self.reclamo!r}")
+
+    @property
+    def motivo_en_caja(self) -> str:
+        """Motivo que se escribe en SISCAJA: empieza con el código del reclamo, si hay."""
+        if self.reclamo and not self.motivo.startswith(f"{self.reclamo} "):
+            return f"{self.reclamo} - {self.motivo}"
+        return self.motivo
 
 
 @dataclass
@@ -72,7 +84,8 @@ def resolver_reclamo(
         "TIPO_RECLAMO": solicitud.tipo_reclamo,
         "SOLUCION": solicitud.solucion,
         "MONTO": solicitud.monto,
-        "MOTIVO": solicitud.motivo,
+        "MOTIVO": solicitud.motivo_en_caja,
+        "RECLAMO": solicitud.reclamo,
         "ITEMS_ESPERADOS": json.dumps(solicitud.items_esperados, ensure_ascii=False)
         if solicitud.items_esperados
         else "",

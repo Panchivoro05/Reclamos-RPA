@@ -4,6 +4,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+RAIZ_REPO = Path(__file__).resolve().parents[3]
+
 
 class AuthMode(StrEnum):
     DEV = "dev"
@@ -42,6 +44,15 @@ class Settings(BaseSettings):
     worker_espera_reintento_s: int = 30
     # "proceso": lanza el bot real (bot-rpa). "simulado": registra sin SISCAJA (demos y pruebas).
     bot_modo: BotModo = BotModo.PROCESO
+    # Dónde está el bot (bot-rpa/) y con qué Python se ejecuta (su propio entorno virtual).
+    worker_bot_dir: Path = RAIZ_REPO / "bot-rpa"
+    worker_bot_python: Path | None = None  # por defecto: <worker_bot_dir>/.venv/bin/python
+    # Tiempo máximo de una ejecución del bot (el bot tiene su propio límite de 180 s).
+    worker_bot_timeout_s: int = 240
+
+    @property
+    def bot_python(self) -> Path:
+        return self.worker_bot_python or self.worker_bot_dir / ".venv" / "bin" / "python"
 
     @property
     def cors_origins_list(self) -> list[str]:

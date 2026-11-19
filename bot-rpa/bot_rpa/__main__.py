@@ -21,6 +21,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--monto", default="", help="Monto en soles (reembolso parcial o cupón)")
     parser.add_argument("--tipo-reclamo", default="")
     parser.add_argument(
+        "--reclamo", default="", help="Código del reclamo (RC-2026-000001): evita duplicados"
+    )
+    parser.add_argument(
         "--items-esperados",
         default="",
         help='JSON: [{"producto": "Hamburguesa Clásica", "cantidad": 1}]',
@@ -40,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             tipo_reclamo=args.tipo_reclamo,
             items_esperados=json.loads(args.items_esperados) if args.items_esperados else [],
             total_esperado=args.total_esperado,
+            reclamo=args.reclamo.strip().upper(),
         )
     except (ValueError, json.JSONDecodeError) as e:
         parser.error(str(e))

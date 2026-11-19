@@ -93,6 +93,30 @@ Leer Comprobante
     Anunciar    Listo · Operacion ${numero} registrada (${monto})
     Capturar Paso    comprobante    Operacion ${numero} registrada por ${monto}
 
+Buscar Compensacion Previa
+    [Documentation]    Revisa el historial del pedido: si ya hay una compensacion de este
+    ...    reclamo (su codigo va al inicio del motivo), devuelve su numero. Asi un reintento
+    ...    del worker nunca compensa dos veces. Sin codigo de reclamo devuelve vacio.
+    [Arguments]    ${reclamo}
+    IF    not $reclamo    RETURN    ${EMPTY}
+    ${fila}    Xpath Compensacion De Reclamo    ${reclamo}
+    ${cantidad}    Get Element Count    ${fila}
+    IF    ${cantidad} == 0    RETURN    ${EMPTY}
+    ${numero}    Get Text    ${fila}/td[1]
+    RETURN    ${numero}
+
+Usar Compensacion Previa
+    [Documentation]    El reclamo ya estaba compensado: lee esa operacion en vez de registrar otra.
+    [Arguments]    ${numero}
+    Anunciar    Paso 4 de 5 · Este reclamo ya tenia la operacion ${numero}
+    Mover Mouse A    id=comp-${numero}
+    ${monto}    Get Text    css=tr[id="comp-${numero}"] td.num
+    Guardar Dato    numero_operacion    ${numero}
+    Guardar Dato    monto_registrado    ${monto}
+    Guardar Dato    reutilizada    si
+    Anunciar    Listo · Se reutilizo la operacion ${numero} (${monto})
+    Capturar Paso    ya_registrada    El reclamo ya tenia la operacion ${numero} por ${monto}
+
 Esperar Respuesta De SISCAJA
     [Documentation]    Después de un clic que cambia de página, espera lo que muestre SISCAJA:
     ...    el elemento de éxito de la página siguiente o un mensaje de error. Si es un
