@@ -8,10 +8,13 @@ import { Tarjeta } from '@/components/Tarjeta';
 import { config } from '@/config';
 import type { NombreIcono } from '@/lib/catalogos';
 import { cerrarSesionFirebase } from '@/lib/firebase';
+import { darDeBajaPush } from '@/lib/push';
 import { queryClient } from '@/lib/queryClient';
 import { useSesion } from '@/store/sesion';
 
 async function cerrarSesion() {
+  // Primero la baja del celular: necesita la sesión para autenticarse.
+  await darDeBajaPush();
   if (config.modoAuth === 'firebase') await cerrarSesionFirebase().catch(() => undefined);
   useSesion.getState().cerrar();
   queryClient.clear();

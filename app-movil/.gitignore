@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Clave privada de la cuenta de servicio de Firebase (se sube a EAS, nunca al repositorio)
+*firebase-adminsdk*.json
+service-account*.json
+/android

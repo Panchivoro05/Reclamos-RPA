@@ -4,6 +4,7 @@ import type { ColorValue } from 'react-native';
 
 import type { NombreIcono } from '@/lib/catalogos';
 import { useEventosEnVivo } from '@/lib/useEventosEnVivo';
+import { useNotificacionesPush } from '@/lib/useNotificacionesPush';
 
 function icono(nombre: NombreIcono) {
   // Los colores de las pestañas se definen abajo como texto (#RRGGBB).
@@ -16,8 +17,9 @@ function icono(nombre: NombreIcono) {
 }
 
 export default function TabsLayout() {
-  // Las pestañas solo existen con sesión: aquí vive la conexión en vivo con la API.
+  // Las pestañas solo existen con sesión: aquí viven la conexión en vivo y las push.
   useEventosEnVivo();
+  useNotificacionesPush();
   return (
     <Tabs
       screenOptions={{
