@@ -24,6 +24,11 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or _url_base.set(
 ).render_as_string(hide_password=False)
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["AUTH_MODE"] = "dev"
+# Las pruebas nunca usan servicios externos, aunque el .env de desarrollo los tenga activos
+# (IA_MODO=gemini, PUSH_MODO=expo): cada prueba que los necesita usa un proveedor falso.
+os.environ["IA_MODO"] = "simulado"
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["PUSH_MODO"] = "falso"
 get_settings.cache_clear()
 
 from alembic.config import Config  # noqa: E402
