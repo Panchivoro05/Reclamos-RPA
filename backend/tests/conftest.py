@@ -119,3 +119,11 @@ def foto_png() -> bytes:
         b"\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe\xa7\x35\x81"
         b"\x84\x00\x00\x00\x00IEND\xaeB`\x82"
     )
+
+
+@pytest.fixture(autouse=True)
+def encolados(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Las pruebas no usan Valkey: los reclamos "encolados" se anotan en esta lista."""
+    ids: list[int] = []
+    monkeypatch.setattr("app.services.cola._enviar", ids.append)
+    return ids

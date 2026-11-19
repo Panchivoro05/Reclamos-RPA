@@ -20,6 +20,8 @@ dependencies = [
     "python-multipart>=0.0.18",
     "firebase-admin>=6.6",
     "httpx>=0.28",
+    # Cola de trabajos. Valkey habla el protocolo de Redis: se usa el transporte "redis".
+    "celery[redis]>=5.5",
 ]
 
 [project.optional-dependencies]
