@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -45,6 +45,7 @@ export default function Asistente() {
   const [error, setError] = useState<string | null>(null);
   const consulta = useConsultarAsistente();
   const lista = useRef<ScrollViewInstance>(null);
+  const alturaEncabezado = useHeaderHeight();
 
   function enviar(entrada: string) {
     const pregunta = prepararPregunta(entrada);
@@ -64,8 +65,9 @@ export default function Asistente() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-neutral-50"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      // "padding" también en Android (va de borde a borde) y el alto real del encabezado.
+      behavior="padding"
+      keyboardVerticalOffset={alturaEncabezado}
     >
       <ScrollView
         ref={lista}

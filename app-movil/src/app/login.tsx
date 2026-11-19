@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, type ReactNode } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
@@ -32,11 +32,13 @@ async function confirmarSesion(sesion: Sesion): Promise<void> {
 export default function Login() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-50">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1"
-      >
-        <ScrollView contentContainerClassName="flex-grow justify-center gap-8 p-6">
+      {/* En Android la app va de borde a borde: la ventana no se achica con el teclado, así
+          que el "padding" se necesita también ahí (si no, el teclado tapa el campo). */}
+      <KeyboardAvoidingView behavior="padding" className="flex-1">
+        <ScrollView
+          contentContainerClassName="flex-grow justify-center gap-8 p-6"
+          keyboardShouldPersistTaps="handled"
+        >
           <View className="items-center gap-3">
             <View className="rounded-3xl bg-marca-500 p-5">
               <Ionicons name="fast-food" size={48} color="#FFFFFF" />

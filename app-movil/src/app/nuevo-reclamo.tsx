@@ -3,12 +3,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch, type UseFormSetError } from 'react-hook-form';
 import {
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -71,6 +71,7 @@ function mostrarErrorDelServidor(
 }
 
 function Formulario({ pedido }: { pedido: PedidoDetalle }) {
+  const alturaEncabezado = useHeaderHeight();
   const crear = useCrearReclamo();
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const disponibles = pedido.tipos_reclamo_disponibles;
@@ -145,10 +146,11 @@ function Formulario({ pedido }: { pedido: PedidoDetalle }) {
   }
 
   return (
+    // "padding" también en Android (va de borde a borde) y el alto real del encabezado.
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       className="flex-1 bg-neutral-50"
-      keyboardVerticalOffset={80}
+      keyboardVerticalOffset={alturaEncabezado}
     >
       <ScrollView contentContainerClassName="gap-6 p-4 pb-10" keyboardShouldPersistTaps="handled">
         <Text className="text-neutral-500">Pedido {pedido.codigo}</Text>
