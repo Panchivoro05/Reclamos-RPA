@@ -40,6 +40,7 @@ POLITICA_POR_DEFECTO = {
     "monto_maximo_automatico": Decimal("40"),
     "max_reclamos_periodo": 3,
     "periodo_dias": 30,
+    "umbral_confianza_ia": Decimal("0.70"),
 }
 
 

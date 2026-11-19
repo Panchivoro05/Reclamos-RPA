@@ -8,7 +8,8 @@ from httpx import Response
 CLIENTE1 = {"X-Dev-User": "cliente1@burgerya.pe"}
 CLIENTE2 = {"X-Dev-User": "cliente2@burgerya.pe"}
 
-DESCRIPCION = "Me llegó una hamburguesa distinta a la que pedí."
+# Coherente con el tipo por defecto (pedido_incompleto): la IA simulada lo confirma.
+DESCRIPCION = "Faltó el combo clásico, no vino en la bolsa."
 
 
 def item_id(client: TestClient, pedido_codigo: str, indice: int = 0) -> int:

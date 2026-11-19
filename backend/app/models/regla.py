@@ -39,7 +39,10 @@ class PoliticaAntifraude(Base):
     """Límites de la resolución automática. Tiene una sola fila (id = 1)."""
 
     __tablename__ = "politica_antifraude"
-    __table_args__ = (CheckConstraint("id = 1", name="una_sola_fila"),)
+    __table_args__ = (
+        CheckConstraint("id = 1", name="una_sola_fila"),
+        CheckConstraint("umbral_confianza_ia BETWEEN 0 AND 1", name="umbral_ia_valido"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
     # Por encima de este monto, la compensación la aprueba un agente.
@@ -47,6 +50,8 @@ class PoliticaAntifraude(Base):
     # Más de esta cantidad de reclamos del cliente en el periodo: revisión humana.
     max_reclamos_periodo: Mapped[int]
     periodo_dias: Mapped[int]
+    # Por debajo de esta confianza de la IA (0 a 1), el reclamo pasa a revisión humana.
+    umbral_confianza_ia: Mapped[Decimal] = mapped_column(Numeric(3, 2), default=Decimal("0.70"))
     actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

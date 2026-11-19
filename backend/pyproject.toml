@@ -26,6 +26,8 @@ dependencies = [
     "redis>=5.2",
     # IA (fase 5): clasificación del reclamo y análisis de la foto con Gemini.
     "google-genai>=3.6",
+    # Hash perceptual de las fotos (detectar la misma foto en otro reclamo).
+    "pillow>=11",
 ]
 
 [project.optional-dependencies]

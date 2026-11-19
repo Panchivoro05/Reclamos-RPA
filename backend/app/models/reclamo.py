@@ -49,6 +49,8 @@ class Reclamo(Base):
     )
     descripcion: Mapped[str] = mapped_column(Text)
     foto_ruta: Mapped[str | None] = mapped_column(String(255))
+    # Hash perceptual de la foto (16 hex): detecta la misma foto en otro reclamo.
+    foto_hash: Mapped[str | None] = mapped_column(String(16))
     creado_en: Mapped[datetime] = creado_en_column()
     actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

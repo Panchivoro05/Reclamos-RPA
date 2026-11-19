@@ -9,6 +9,7 @@ from app.core.db import SessionLocal
 from app.services.almacenamiento import get_almacenamiento
 from app.services.bot import EjecutorBot, EjecutorBotSimulado
 from app.services.bot_proceso import EjecutorBotProceso
+from app.services.ia import get_proveedor_ia
 from app.services.procesamiento import Resultado, procesar_reclamo, reclamos_sin_encolar
 from app.worker.celery_app import celery_app
 
@@ -34,6 +35,7 @@ def procesar_reclamo_tarea(self: Task, reclamo_id: int) -> str:
             intento=intento,
             ultimo_intento=ultimo,
             almacenamiento=get_almacenamiento(),
+            ia=get_proveedor_ia(),
         )
     if resultado == Resultado.REINTENTAR:
         espera = settings.worker_espera_reintento_s * 2**self.request.retries

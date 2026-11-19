@@ -112,6 +112,7 @@ PALABRAS_CLAVE: dict[TipoReclamo, tuple[str, ...]] = {
         "no era lo que",
         "me trajeron otr",
         "cambiad",
+        "distint",
     ),
     TipoReclamo.PEDIDO_INCOMPLETO: (
         "falt",

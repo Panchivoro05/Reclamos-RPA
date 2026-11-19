@@ -7,7 +7,7 @@ explica por separado. `decidir` solo junta esos datos desde la base.
 La IA (fase 5) nunca decide montos: los montos salen siempre de estas reglas.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -64,6 +64,10 @@ class Decision:
     @property
     def aprobada(self) -> bool:
         return self.solucion is not None and all(c.aprobado for c in self.controles)
+
+    def con_controles(self, extra: list[Control]) -> "Decision":
+        """La misma decisión con más controles (los de la IA y la foto repetida)."""
+        return replace(self, controles=[*self.controles, *extra])
 
     @property
     def motivo_escalamiento(self) -> str | None:

@@ -1,4 +1,4 @@
-"""Procesamiento automático de un reclamo: reglas, antifraude y bot RPA.
+"""Procesamiento automático de un reclamo: reglas, antifraude, IA y bot RPA.
 
 recibido → en_validacion → validado → en_resolucion → resuelto
                  └──────────→ escalado ←──────────┘
@@ -27,11 +27,22 @@ from app.models import (
     ReclamoItem,
     TipoReclamo,
 )
-from app.services.almacenamiento import AlmacenamientoArchivos
+from app.services.almacenamiento import AlmacenamientoArchivos, get_almacenamiento
+from app.services.analisis import (
+    AnalisisIA,
+    analizar_con_ia,
+    control_foto_repetida,
+    controles_ia,
+    hash_foto,
+    preparar_entradas,
+    reclamo_con_la_misma_foto,
+)
 from app.services.bot import EjecutorBot, ResultadoBot, SolicitudBot
 from app.services.eventos import CambioEstado, publicar_cambio
 from app.services.evidencia import guardar_evidencia
-from app.services.resolucion import decidir, describir_compensacion
+from app.services.ia import ErrorIA, ProveedorIA
+from app.services.reglas import obtener_politica
+from app.services.resolucion import Decision, decidir, describir_compensacion
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +73,7 @@ ESTADOS_PENDIENTES = frozenset(
 class Resultado(StrEnum):
     RESUELTO = "resuelto"
     ESCALADO = "escalado"
-    REINTENTAR = "reintentar"  # error técnico del bot: la tarea vuelve a intentar más tarde
+    REINTENTAR = "reintentar"  # error técnico (bot o IA): la tarea vuelve a intentar más tarde
     SIN_CAMBIOS = "sin_cambios"  # ya estaba terminado (mensaje duplicado de la cola)
 
 
@@ -74,18 +85,51 @@ def procesar_reclamo(
     intento: int = 1,
     ultimo_intento: bool = True,
     almacenamiento: AlmacenamientoArchivos | None = None,
+    ia: ProveedorIA | None = None,
 ) -> Resultado:
-    """Avanza el reclamo todo lo posible. Con `almacenamiento`, guarda la evidencia del bot."""
+    """Avanza el reclamo todo lo posible.
+
+    Con `almacenamiento`, guarda la evidencia del bot. Con `ia`, analiza el texto y la foto
+    (el worker siempre la pasa; sin ella, solo se aplican las reglas).
+    """
     reclamo = _bloquear(session, reclamo_id)
     if reclamo is None or reclamo.estado not in ESTADOS_PENDIENTES:
         session.rollback()
         return Resultado.SIN_CAMBIOS
 
-    # 1. Reglas y antifraude (si se cortó a mitad de la validación, se valida de nuevo).
+    # 1. Reglas, antifraude e IA (si se cortó a mitad de la validación, se valida de nuevo).
     if reclamo.estado in (EstadoReclamo.RECIBIDO, EstadoReclamo.EN_VALIDACION):
         if reclamo.estado == EstadoReclamo.RECIBIDO:
             _cambiar_estado(session, reclamo, EstadoReclamo.EN_VALIDACION, MENSAJE_EN_VALIDACION)
-        decision = decidir(session, reclamo)
+        foto = _leer_foto(reclamo, almacenamiento)
+        analisis: AnalisisIA | None = None
+        if ia is not None:
+            entradas = preparar_entradas(reclamo, foto)
+            # La IA puede tardar decenas de segundos: no se mantiene la fila bloqueada.
+            session.commit()
+            try:
+                analisis = analizar_con_ia(session, reclamo_id, entradas, ia)
+                session.commit()  # guarda el registro de las llamadas
+            except ErrorIA as error:
+                session.commit()  # guarda el registro de la llamada fallida
+                if not ultimo_intento:
+                    logger.warning(
+                        "Reclamo %d: la IA falló (%s); se reintentará", reclamo_id, error
+                    )
+                    return Resultado.REINTENTAR
+                reclamo = _bloquear(session, reclamo_id)
+                if reclamo is None or reclamo.estado != EstadoReclamo.EN_VALIDACION:
+                    session.rollback()
+                    return Resultado.SIN_CAMBIOS
+                return _escalar(
+                    session, reclamo, f"No se pudo completar el análisis con IA: {error}"
+                )
+            reclamo = _bloquear(session, reclamo_id)
+            if reclamo is None or reclamo.estado != EstadoReclamo.EN_VALIDACION:
+                # Otro proceso lo avanzó mientras la IA trabajaba.
+                session.rollback()
+                return Resultado.SIN_CAMBIOS
+        decision = _decidir_con_analisis(session, reclamo, foto, analisis)
         if not decision.aprobada or decision.solucion is None:
             return _escalar(session, reclamo, str(decision.motivo_escalamiento))
         reclamo.solucion = decision.solucion
@@ -152,6 +196,28 @@ def procesar_reclamo(
         reclamo,
         f"El bot no pudo registrar la compensación ({resultado.codigo_error}): {resultado.mensaje}",
     )
+
+
+def _leer_foto(reclamo: Reclamo, almacenamiento: AlmacenamientoArchivos | None) -> bytes | None:
+    if not reclamo.foto_ruta:
+        return None
+    return (almacenamiento or get_almacenamiento()).leer(reclamo.foto_ruta)
+
+
+def _decidir_con_analisis(
+    session: Session, reclamo: Reclamo, foto: bytes | None, analisis: AnalisisIA | None
+) -> Decision:
+    """Reglas y antifraude, más la foto repetida y (si hubo) los controles de la IA."""
+    decision = decidir(session, reclamo)
+    extra = []
+    if foto:
+        reclamo.foto_hash = reclamo.foto_hash or hash_foto(foto)
+        if reclamo.foto_hash:
+            extra.append(control_foto_repetida(reclamo_con_la_misma_foto(session, reclamo)))
+    if analisis is not None:
+        umbral = obtener_politica(session).umbral_confianza_ia
+        extra += controles_ia(reclamo.tipo, analisis, umbral)
+    return decision.con_controles(extra)
 
 
 def reclamos_sin_encolar(session: Session, antiguedad: timedelta) -> list[int]:
