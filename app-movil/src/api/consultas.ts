@@ -45,24 +45,30 @@ export function useReclamos() {
 }
 
 /** Estados en los que el worker todavía está trabajando el reclamo. */
-const ESTADOS_EN_PROCESO = new Set<EstadoReclamo>([
+export const ESTADOS_EN_PROCESO = new Set<EstadoReclamo>([
   'recibido',
   'en_validacion',
   'validado',
   'en_resolucion',
 ]);
 
-export function useReclamo(codigo: string) {
+/**
+ * Detalle de un reclamo. Con la conexión en vivo, se recarga cuando llega un aviso
+ * (useEventosEnVivo). Sin ella, mientras el reclamo se procesa se consulta cada 3 s.
+ */
+export function useReclamo(codigo: string, enVivo: boolean) {
   return useQuery({
     queryKey: claves.reclamo(codigo),
     queryFn: () => api<ReclamoDetalle>(`/reclamos/${encodeURIComponent(codigo)}`),
-    // Mientras se procesa, se consulta cada 3 s para ver avanzar los estados.
-    // (En la fase 4 esto lo reemplaza el WebSocket.)
-    refetchInterval: (consulta) => {
-      const estado = consulta.state.data?.estado;
-      return estado && ESTADOS_EN_PROCESO.has(estado) ? 3000 : false;
-    },
+    refetchInterval: (consulta) => intervaloDeRespaldo(consulta.state.data?.estado, enVivo),
   });
+}
+
+export function intervaloDeRespaldo(
+  estado: EstadoReclamo | undefined,
+  enVivo: boolean,
+): number | false {
+  return !enVivo && estado !== undefined && ESTADOS_EN_PROCESO.has(estado) ? 3000 : false;
 }
 
 export interface FotoAdjunta {

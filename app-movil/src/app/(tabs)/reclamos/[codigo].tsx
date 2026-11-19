@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { urlApi } from '@/api/cliente';
-import { useReclamo } from '@/api/consultas';
+import { ESTADOS_EN_PROCESO, useReclamo } from '@/api/consultas';
 import type { ReclamoDetalle, ReclamoEvento, Resolucion } from '@/api/tipos';
 import { Boton } from '@/components/Boton';
 import { Cargando, ErrorPantalla } from '@/components/EstadosPantalla';
@@ -15,10 +15,12 @@ import { Tarjeta } from '@/components/Tarjeta';
 import { ESTADOS_RECLAMO, TIPOS_RECLAMO_INFO } from '@/lib/catalogos';
 import { formatoFechaHora } from '@/lib/formato';
 import { useEncabezadosAuth } from '@/lib/useEncabezadosAuth';
+import { useEstadoEnVivo } from '@/store/enVivo';
 
 export default function DetalleReclamo() {
   const { codigo } = useLocalSearchParams<{ codigo: string }>();
-  const { data: reclamo, isPending, error, refetch, isRefetching } = useReclamo(codigo);
+  const enVivo = useEstadoEnVivo((estado) => estado.estado === 'en_vivo');
+  const { data: reclamo, isPending, error, refetch, isRefetching } = useReclamo(codigo, enVivo);
 
   return (
     <>
@@ -34,7 +36,7 @@ export default function DetalleReclamo() {
             <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
           }
         >
-          <Datos reclamo={reclamo} />
+          <Datos reclamo={reclamo} enVivo={enVivo} />
           {reclamo.resolucion && (
             <TarjetaResolucion
               resolucion={reclamo.resolucion}
@@ -49,7 +51,20 @@ export default function DetalleReclamo() {
   );
 }
 
-function Datos({ reclamo }: { reclamo: ReclamoDetalle }) {
+/** Mientras el reclamo se procesa: si los cambios llegan al instante o cada pocos segundos. */
+function IndicadorEnVivo({ enVivo }: { enVivo: boolean }) {
+  return (
+    <View
+      className="flex-row items-center gap-1.5"
+      accessibilityLabel={enVivo ? 'Actualización en vivo' : 'Actualización periódica'}
+    >
+      <View className={`h-2 w-2 rounded-full ${enVivo ? 'bg-green-600' : 'bg-neutral-400'}`} />
+      <Text className="text-xs text-neutral-500">{enVivo ? 'En vivo' : 'Actualizando…'}</Text>
+    </View>
+  );
+}
+
+function Datos({ reclamo, enVivo }: { reclamo: ReclamoDetalle; enVivo: boolean }) {
   const tipo = TIPOS_RECLAMO_INFO[reclamo.tipo];
   return (
     <Tarjeta className="gap-3">
@@ -62,7 +77,10 @@ function Datos({ reclamo }: { reclamo: ReclamoDetalle }) {
           <Text className="text-neutral-500">Pedido {reclamo.pedido_codigo}</Text>
         </View>
       </View>
-      <Insignia estado={ESTADOS_RECLAMO[reclamo.estado]} />
+      <View className="flex-row items-center justify-between">
+        <Insignia estado={ESTADOS_RECLAMO[reclamo.estado]} />
+        {ESTADOS_EN_PROCESO.has(reclamo.estado) && <IndicadorEnVivo enVivo={enVivo} />}
+      </View>
       <Text className="text-neutral-700">{reclamo.descripcion}</Text>
       {reclamo.items.length > 0 && (
         <View className="gap-1 border-t border-neutral-200 pt-3">

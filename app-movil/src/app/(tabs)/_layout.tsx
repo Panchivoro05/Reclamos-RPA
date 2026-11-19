@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 
 import type { NombreIcono } from '@/lib/catalogos';
+import { useEventosEnVivo } from '@/lib/useEventosEnVivo';
 
 function icono(nombre: NombreIcono) {
   // Los colores de las pestañas se definen abajo como texto (#RRGGBB).
@@ -15,6 +16,8 @@ function icono(nombre: NombreIcono) {
 }
 
 export default function TabsLayout() {
+  // Las pestañas solo existen con sesión: aquí vive la conexión en vivo con la API.
+  useEventosEnVivo();
   return (
     <Tabs
       screenOptions={{
