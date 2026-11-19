@@ -24,6 +24,7 @@ class PushModo(StrEnum):
 
 class IAModo(StrEnum):
     SIMULADO = "simulado"  # reglas de palabras clave: pruebas y demos sin internet
+    GEMINI = "gemini"  # API de Gemini (necesita GEMINI_API_KEY)
 
 
 class Settings(BaseSettings):
@@ -67,9 +68,16 @@ class Settings(BaseSettings):
 
     # ---------- Inteligencia artificial (fase 5) ----------
     ia_modo: IAModo = IAModo.SIMULADO
+    # Clave de Google AI Studio (aistudio.google.com). Secreta: solo en el .env.
+    gemini_api_key: str = ""
+    # Estable, multimodal (texto e imagen) y el más económico de la línea actual.
+    ia_modelo: str = "gemini-3.5-flash-lite"
+    # Con alta demanda, Gemini llegó a tardar ~60 s en responder (medido en desarrollo).
+    ia_timeout_s: float = 60
     # Precio del modelo en USD por millón de tokens: solo para estimar el costo de cada llamada.
-    ia_precio_entrada_usd_millon: float = 0.0
-    ia_precio_salida_usd_millon: float = 0.0
+    # Valores de gemini-3.5-flash-lite (plan de pago); en el plan gratuito no se cobra.
+    ia_precio_entrada_usd_millon: float = 0.30
+    ia_precio_salida_usd_millon: float = 2.50
 
     @property
     def bot_python(self) -> Path:

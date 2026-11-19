@@ -24,6 +24,8 @@ dependencies = [
     "celery[redis]>=5.5",
     # Cliente de Valkey para pub/sub (eventos en tiempo real); ya lo trae Celery.
     "redis>=5.2",
+    # IA (fase 5): clasificación del reclamo y análisis de la foto con Gemini.
+    "google-genai>=3.6",
 ]
 
 [project.optional-dependencies]

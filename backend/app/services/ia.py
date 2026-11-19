@@ -237,3 +237,10 @@ def get_proveedor_ia() -> ProveedorIA:
     match settings.ia_modo:
         case IAModo.SIMULADO:
             return ProveedorSimulado()
+        case IAModo.GEMINI:
+            # Import diferido: sin IA_MODO=gemini no se carga el SDK.
+            from app.services.ia_gemini import ProveedorGemini
+
+            return ProveedorGemini(
+                settings.gemini_api_key, settings.ia_modelo, timeout_s=settings.ia_timeout_s
+            )
